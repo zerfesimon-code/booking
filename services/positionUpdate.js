@@ -1,5 +1,5 @@
 const { Live } = require('../models/bookingModels');
-const { broadcast } = require('../sockets');
+const { broadcast } = require('../sockets/utils');
 
 class PositionUpdateService {
   constructor() {

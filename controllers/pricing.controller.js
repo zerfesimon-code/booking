@@ -1,6 +1,6 @@
 const { Pricing } = require('../models/pricing');
 const { crudController } = require('./basic.crud');
-const { broadcast } = require('../sockets');
+const { broadcast } = require('../sockets/utils');
 
 const base = crudController(Pricing);
 
