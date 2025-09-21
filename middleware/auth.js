@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const axios = require('axios');
+const { logger } = require('../utils/logger');
 
 // Minimal JWKS cache
 const jwksCache = { keys: {}, fetchedAt: 0 };
@@ -26,8 +27,19 @@ async function getSigningKey(kid) {
 }
 
 const authenticate = async (req, res, next) => {
+  const startTime = Date.now();
   const authHeader = req.headers.authorization;
+  
+  logger.apiRequest(req.method, req.path, null, {
+    hasAuthHeader: !!authHeader,
+    userAgent: req.headers['user-agent'],
+    ip: req.ip || req.connection.remoteAddress
+  });
+  
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    logger.apiResponse(req.method, req.path, 401, Date.now() - startTime, {
+      error: 'No token provided'
+    });
     return res.status(401).json({ message: 'Authentication failed: No token provided.' });
   }
   const token = authHeader.split(' ')[1];
@@ -58,11 +70,24 @@ const authenticate = async (req, res, next) => {
       decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
     }
     req.user = decoded; 
+    
+    logger.apiResponse(req.method, req.path, 200, Date.now() - startTime, {
+      userId: decoded.id,
+      userType: decoded.type,
+      tokenExpiry: new Date(decoded.exp * 1000).toISOString()
+    });
+    
     if (process.env.AUTH_DEBUG === '1') {
       console.log('✅ Token valid:', { id: decoded.id, type: decoded.type, exp: new Date(decoded.exp * 1000) });
     }
     next();
   } catch (error) {
+    logger.apiResponse(req.method, req.path, 401, Date.now() - startTime, {
+      error: error.message,
+      tokenPreview: token ? `${token.substring(0, 30)}...` : 'null',
+      secretUsed: process.env.JWT_SECRET ? 'env var' : 'default'
+    });
+    
     if (process.env.AUTH_DEBUG === '1') {
       console.log('❌ Token invalid:', { 
         error: error.message, 
@@ -93,7 +118,15 @@ const authorize = (...allowedRoles) => {
 
   const allowed = (allowedRoles || []).map(r => normalizeRoleString(r));
   return (req, res, next) => {
-    if (!req.user) return res.status(403).json({ message: 'Forbidden: No user information found.' });
+    const startTime = Date.now();
+    
+    if (!req.user) {
+      logger.apiResponse(req.method, req.path, 403, Date.now() - startTime, {
+        error: 'No user information found',
+        userId: null
+      });
+      return res.status(403).json({ message: 'Forbidden: No user information found.' });
+    }
 
     // DEBUG: Log token details for troubleshooting
     if (process.env.AUTH_DEBUG === '1') {
@@ -161,9 +194,26 @@ const authorize = (...allowedRoles) => {
       typeCandidates.some(t => allowed.includes(t));
 
     if (isAuthorized) {
+      logger.apiResponse(req.method, req.path, 200, Date.now() - startTime, {
+        userId: req.user.id,
+        userType: req.user.type,
+        authorized: true,
+        allowedRoles: allowedRoles,
+        userRoles: normalizedUserRoles
+      });
+      
       if (process.env.AUTH_DEBUG === '1') console.log('✅ Authorization granted');
       return next();
     }
+    
+    logger.apiResponse(req.method, req.path, 403, Date.now() - startTime, {
+      userId: req.user.id,
+      userType: req.user.type,
+      authorized: false,
+      allowedRoles: allowedRoles,
+      userRoles: normalizedUserRoles,
+      userTypes: typeCandidates
+    });
     
     if (process.env.AUTH_DEBUG === '1') console.log('❌ Authorization denied');
     return res.status(403).json({ 
