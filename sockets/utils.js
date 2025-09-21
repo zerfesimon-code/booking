@@ -9,6 +9,19 @@ function getIo() {
   return ioRef;
 }
 
+function broadcast(event, data) {
+  const io = ioRef;
+  if (io) {
+    try {
+      io.emit(event, data);
+    } catch (e) {
+      logger.error('Failed to broadcast event', event, e);
+    }
+  } else {
+    logger.warn('Socket.io not initialized for broadcast.');
+  }
+}
+
 const sendMessageToSocketId = (socketId, messageObject) => {
   const io = ioRef;
   if (io) {
@@ -23,4 +36,4 @@ const sendMessageToSocketId = (socketId, messageObject) => {
   }
 };
 
-module.exports = { setIo, getIo, sendMessageToSocketId };
+module.exports = { setIo, getIo, broadcast, sendMessageToSocketId };

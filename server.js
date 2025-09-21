@@ -9,7 +9,7 @@ require('dotenv').config();
 
 const { connectMongo } = require('./config/mongo');
 const apiRoutes = require('./routes');
-const { attachSocketHandlers } = require('./sockets');
+const { initializeSocket } = require('./services/socketService');
 const positionUpdateService = require('./services/positionUpdate');
 
 const app = express();
@@ -36,7 +36,7 @@ app.use('/v1', apiRoutes);
 // ---------- SERVER ----------
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
-attachSocketHandlers(io);
+initializeSocket(io);
 
 const PORT = process.env.BOOKING_PORT || process.env.PORT || 4000;
 connectMongo()

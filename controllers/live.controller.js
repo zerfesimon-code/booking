@@ -1,6 +1,6 @@
 const { Live } = require('../models/bookingModels');
 const { crudController } = require('./basic.crud');
-const { broadcast } = require('../sockets');
+const { broadcast } = require('../sockets/utils');
 
 const base = crudController(Live);
 
