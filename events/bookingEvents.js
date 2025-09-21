@@ -25,3 +25,36 @@ module.exports = {
   emitBookingAssigned
 };
 
+function emitTripStarted(io, booking) {
+  try {
+    const payload = { bookingId: String(booking._id), startedAt: booking.startedAt, startLocation: booking.startLocation };
+    io.to(`booking:${String(booking._id)}`).emit('trip_started', payload);
+  } catch (_) {}
+}
+
+function emitTripOngoing(io, booking, location) {
+  try {
+    const payload = { bookingId: String(booking._id || booking), location };
+    io.to(`booking:${String(booking._id || booking)}`).emit('trip_ongoing', payload);
+  } catch (_) {}
+}
+
+function emitTripCompleted(io, booking) {
+  try {
+    const payload = {
+      bookingId: String(booking._id),
+      amount: booking.fareFinal || booking.fareEstimated,
+      distance: booking.distanceKm,
+      waitingTime: booking.waitingTime,
+      completedAt: booking.completedAt,
+      driverEarnings: booking.driverEarnings,
+      commission: booking.commissionAmount
+    };
+    io.to(`booking:${String(booking._id)}`).emit('trip_completed', payload);
+  } catch (_) {}
+}
+
+module.exports.emitTripStarted = emitTripStarted;
+module.exports.emitTripOngoing = emitTripOngoing;
+module.exports.emitTripCompleted = emitTripCompleted;
+

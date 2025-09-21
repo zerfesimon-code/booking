@@ -1,6 +1,9 @@
 const bookingService = require('../services/bookingService');
 const bookingEvents = require('../events/bookingEvents');
 const { sendMessageToSocketId } = require('./utils');
+const lifecycle = require('../services/bookingLifecycleService');
+const logger = require('../utils/logger');
+const { Booking } = require('../models/bookingModels');
 
 module.exports = (io, socket) => {
   // booking_request (create booking)
@@ -101,5 +104,69 @@ module.exports = (io, socket) => {
       bookingEvents.emitBookingUpdate(String(updated._id), { status: 'canceled', canceledBy: String(socket.user.type).toLowerCase(), canceledReason: reason });
     } catch (err) {}
   });
-};
 
+  // trip_started
+  socket.on('trip_started', async (payload) => {
+    try {
+      const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
+      const bookingId = String(data.bookingId || '');
+      const startLocation = data.startLocation || data.location;
+      if (!socket.user || String(socket.user.type).toLowerCase() !== 'driver') {
+        return socket.emit('booking_error', { message: 'Unauthorized: driver token required', source: 'trip_started' });
+      }
+      if (!bookingId) return socket.emit('booking_error', { message: 'bookingId is required', source: 'trip_started' });
+      const booking = await Booking.findOne({ _id: bookingId, driverId: String(socket.user.id) });
+      if (!booking) return socket.emit('booking_error', { message: 'Booking not found or not assigned to you', source: 'trip_started' });
+      const updated = await lifecycle.startTrip(bookingId, startLocation);
+      bookingEvents.emitTripStarted(io, updated);
+    } catch (err) {
+      logger.error('[trip_started] error', err);
+      socket.emit('booking_error', { message: 'Failed to start trip', source: 'trip_started' });
+    }
+  });
+
+  // trip_ongoing
+  socket.on('trip_ongoing', async (payload) => {
+    try {
+      const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
+      const bookingId = String(data.bookingId || '');
+      const location = data.location || { latitude: data.latitude, longitude: data.longitude };
+      if (!socket.user || String(socket.user.type).toLowerCase() !== 'driver') {
+        return socket.emit('booking_error', { message: 'Unauthorized: driver token required', source: 'trip_ongoing' });
+      }
+      if (!bookingId || !location || location.latitude == null || location.longitude == null) {
+        return socket.emit('booking_error', { message: 'bookingId and location are required', source: 'trip_ongoing' });
+      }
+      const booking = await Booking.findOne({ _id: bookingId, driverId: String(socket.user.id) }).lean();
+      if (!booking) return socket.emit('booking_error', { message: 'Booking not found or not assigned to you', source: 'trip_ongoing' });
+      const point = await lifecycle.updateTripLocation(bookingId, String(socket.user.id), location);
+      bookingEvents.emitTripOngoing(io, bookingId, point);
+    } catch (err) {
+      logger.error('[trip_ongoing] error', err);
+      socket.emit('booking_error', { message: 'Failed to update trip location', source: 'trip_ongoing' });
+    }
+  });
+
+  // trip_completed
+  socket.on('trip_completed', async (payload) => {
+    try {
+      const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
+      const bookingId = String(data.bookingId || '');
+      const endLocation = data.endLocation || data.location;
+      const surgeMultiplier = data.surgeMultiplier || 1;
+      const discount = data.discount || 0;
+      const debitPassengerWallet = !!data.debitPassengerWallet;
+      if (!socket.user || String(socket.user.type).toLowerCase() !== 'driver') {
+        return socket.emit('booking_error', { message: 'Unauthorized: driver token required', source: 'trip_completed' });
+      }
+      if (!bookingId) return socket.emit('booking_error', { message: 'bookingId is required', source: 'trip_completed' });
+      const booking = await Booking.findOne({ _id: bookingId, driverId: String(socket.user.id) });
+      if (!booking) return socket.emit('booking_error', { message: 'Booking not found or not assigned to you', source: 'trip_completed' });
+      const updated = await lifecycle.completeTrip(bookingId, endLocation, { surgeMultiplier, discount, debitPassengerWallet });
+      bookingEvents.emitTripCompleted(io, updated);
+    } catch (err) {
+      logger.error('[trip_completed] error', err);
+      socket.emit('booking_error', { message: 'Failed to complete trip', source: 'trip_completed' });
+    }
+  });
+};
