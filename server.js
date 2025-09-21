@@ -9,7 +9,7 @@ require('dotenv').config();
 
 const { connectMongo } = require('./config/mongo');
 const apiRoutes = require('./routes');
-const { attachSocketHandlers } = require('./sockets');
+const { attachSocketHandlers } = require('./sockets/modular');
 const positionUpdateService = require('./services/positionUpdate');
 
 const app = express();
