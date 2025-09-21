@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const ctrl = require("../../controllers/wallet.controller");
-const driverWallet = require("../../controllers/driverWallet.controller");
+const ctrl = require("../../modules/wallet/controllers/walletController");
+const driverWallet = require("../../modules/driver/controllers/driverWalletController");
 const { authenticate, authorize } = require("../../middleware/auth");
 
 router.post("/topup", authenticate, ctrl.topup);

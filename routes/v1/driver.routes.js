@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const ctrl = require('../../controllers/driver.controller');
-const walletCtrl = require('../../controllers/driverWallet.controller');
+const ctrl = require('../../modules/driver/controllers/driverController');
+const walletCtrl = require('../../modules/driver/controllers/driverWalletController');
 const { authenticate, authorize } = require('../../middleware/auth');
 
 // Remove driver creation via API

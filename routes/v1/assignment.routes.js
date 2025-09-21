@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const ctrl = require('../../controllers/assignment.controller');
+const ctrl = require('../../modules/assignment/controllers/assignmentController');
 const { authenticate, authorize } = require('../../middleware/auth');
 
 router.post('/', authenticate, authorize('staff','admin'), ctrl.create);

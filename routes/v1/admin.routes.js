@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const ctrl = require('../../controllers/admin.controller');
+const ctrl = require('../../modules/admin/controllers/adminController');
 const { authorize } = require('../../middleware/auth');
 
 router.get('/', authorize('admin','superadmin'), ctrl.list);

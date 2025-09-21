@@ -9,8 +9,7 @@ router.use(
   (() => {
     const express = require("express");
     const r = express.Router();
-    const ctrl = require("../../controllers/wallet.controller");
-    // public webhook only
+    const ctrl = require("../../modules/wallet/controllers/walletController");
     r.post("/webhook", ctrl.webhook);
     return r;
   })()

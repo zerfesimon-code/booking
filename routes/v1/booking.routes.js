@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const ctrl = require('../../controllers/booking.controller');
+const ctrl = require('../../modules/booking/controllers/bookingController');
 const { authenticate, authorize } = require('../../middleware/auth');
 
 router.post('/', authenticate, authorize('passenger'), ctrl.create);

@@ -1,7 +1,7 @@
 
 const express = require('express');
 const router = express.Router();
-const ctrl = require('../../controllers/passenger.controller');
+const ctrl = require('../../modules/passenger/controllers/passengerController');
 const { authenticate, authorize } = require('../../middleware/auth');
 
 // Admin/staff manage passengers

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const ctrl = require('../../controllers/analytics.controller');
+const ctrl = require('../../modules/analytics/controllers/analyticsController');
 const { authenticate, authorize } = require('../../middleware/auth');
 
 // Dashboard Statistics - Admin only

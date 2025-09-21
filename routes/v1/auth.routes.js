@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const ctrl = require('../../controllers/auth.controller');
+const ctrl = require('../../modules/auth/controllers/authController');
 const rateLimit = require('../../middleware/rateLimit');
 
 router.post('/passenger/register', rateLimit({ windowMs: 60_000, max: 10 }), ctrl.registerPassenger);

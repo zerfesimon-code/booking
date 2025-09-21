@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const ctrl = require('../../controllers/pricing.controller');
+const ctrl = require('../../modules/pricing/controllers/pricingController');
 const { authenticate, authorize } = require('../../middleware/auth');
 
 router.post('/', authenticate, authorize('admin'), ctrl.create);
