@@ -8,6 +8,92 @@
 		"_collection_link": "https://lunar-eclipse-303269.postman.co/workspace/2fca546d-3b99-4f54-8acb-523fdaa9f75b/collection/24624704-5be35b59-c6ac-4de2-a960-691e41ad1dad?action=share&source=collection_link&creator=24624704"
 	},
 	"item": [
+        {
+            "name": "🧩 Socket.IO Events",
+            "item": [
+                {
+                    "name": "Socket Connect (Passenger)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "X-Postman-Note", "value": "Use a Socket.IO client. This is a documentation stub." }
+                        ],
+                        "url": { "raw": "wss://{{baseUrl}}?token={{passengerToken}}" }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "booking_request (Passenger)",
+                    "request": {
+                        "method": "POST",
+                        "header": [ { "key": "X-Postman-Note", "value": "Socket.IO emit: booking_request" } ],
+                        "body": { "mode": "raw", "raw": "{\n  \"vehicleType\": \"mini\",\n  \"pickup\": { \"latitude\": 40.7128, \"longitude\": -74.0060 },\n  \"dropoff\": { \"latitude\": 40.7589, \"longitude\": -73.9851 }\n}" },
+                        "url": { "raw": "socketio://emit/booking_request" }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "booking_accept (Driver)",
+                    "request": {
+                        "method": "POST",
+                        "header": [ { "key": "X-Postman-Note", "value": "Socket.IO emit: booking_accept" } ],
+                        "body": { "mode": "raw", "raw": "{\n  \"bookingId\": \"{{bookingId}}\"\n}" },
+                        "url": { "raw": "socketio://emit/booking_accept" }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "booking_cancel (Driver/Passenger)",
+                    "request": {
+                        "method": "POST",
+                        "header": [ { "key": "X-Postman-Note", "value": "Socket.IO emit: booking_cancel" } ],
+                        "body": { "mode": "raw", "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"reason\": \"no-show\"\n}" },
+                        "url": { "raw": "socketio://emit/booking_cancel" }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "booking:status_request (Any)",
+                    "request": {
+                        "method": "POST",
+                        "header": [ { "key": "X-Postman-Note", "value": "Socket.IO emit: booking:status_request" } ],
+                        "body": { "mode": "raw", "raw": "{\n  \"bookingId\": \"{{bookingId}}\"\n}" },
+                        "url": { "raw": "socketio://emit/booking:status_request" }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "booking:ETA_update (Driver)",
+                    "request": {
+                        "method": "POST",
+                        "header": [ { "key": "X-Postman-Note", "value": "Socket.IO emit: booking:ETA_update" } ],
+                        "body": { "mode": "raw", "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"etaMinutes\": 6,\n  \"message\": \"Coming soon\"\n}" },
+                        "url": { "raw": "socketio://emit/booking:ETA_update" }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "driver:availability (Driver)",
+                    "request": {
+                        "method": "POST",
+                        "header": [ { "key": "X-Postman-Note", "value": "Socket.IO emit: driver:availability" } ],
+                        "body": { "mode": "raw", "raw": "{\n  \"available\": true\n}" },
+                        "url": { "raw": "socketio://emit/driver:availability" }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "booking:driver_location_update (Driver)",
+                    "request": {
+                        "method": "POST",
+                        "header": [ { "key": "X-Postman-Note", "value": "Socket.IO emit: booking:driver_location_update" } ],
+                        "body": { "mode": "raw", "raw": "{\n  \"latitude\": 40.7128,\n  \"longitude\": -74.0060,\n  \"bearing\": 45,\n  \"bookingId\": \"{{bookingId}}\"\n}" },
+                        "url": { "raw": "socketio://emit/booking:driver_location_update" }
+                    },
+                    "response": []
+                }
+            ]
+        },
 		{
 			"name": "🔐 Authentication",
 			"item": [
