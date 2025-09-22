@@ -10,7 +10,9 @@ const PassengerSchema = new mongoose.Schema({
   email: { type: String, index: true, unique: true },
   password: { type: String, required: true },
   emergencyContacts: [{ name: String, phone: String }],
-  roles: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Role' }]
+  roles: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Role' }],
+  // Rewards balance stored directly on user to avoid new collections
+  rewardPoints: { type: Number, default: 0 }
 }, { timestamps: true, toJSON: { versionKey: false }, toObject: { versionKey: false } });
 
 PassengerSchema.set('toJSON', {
@@ -45,7 +47,9 @@ const DriverSchema = new mongoose.Schema({
   // Rating information
   rating: { type: Number, default: 5.0, min: 1, max: 5 },
   ratingCount: { type: Number, default: 0 },
-  roles: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Role' }]
+  roles: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Role' }],
+  // Rewards balance stored directly on user to avoid new collections
+  rewardPoints: { type: Number, default: 0 }
 }, { timestamps: true, _id: false, toJSON: { versionKey: false }, toObject: { versionKey: false } });
 
 DriverSchema.set('toJSON', {

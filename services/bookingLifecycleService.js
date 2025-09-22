@@ -4,6 +4,9 @@ const { haversineKm } = require('../utils/distance');
 const pricingService = require('./pricingService');
 const commissionService = require('./commissionService');
 const walletService = require('./walletService');
+const { Passenger, Driver } = (() => {
+  try { return require('../models/userModels'); } catch (_) { return {}; }
+})();
 
 async function startTrip(bookingId, startLocation) {
   const booking = await Booking.findById(bookingId);
@@ -21,8 +24,13 @@ async function startTrip(bookingId, startLocation) {
         passengerId: booking.passengerId,
         vehicleType: booking.vehicleType,
         startedAt: booking.startedAt,
-        status: 'ongoing',
+        status: 'in-progress',
         locations: []
+      },
+      $set: {
+        startLocation: startLocation || booking.startLocation || undefined,
+        // Keep legacy alias updated for compatibility
+        pickupLocation: startLocation || booking.startLocation || undefined
       }
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -79,6 +87,7 @@ async function completeTrip(bookingId, endLocation, options = {}) {
   }
 
   const waitingTimeMinutes = Math.max(0, Math.round(((completedAt - new Date(startedAt)) / 60000)));
+  const durationMinutes = Math.max(0, Math.round(((completedAt - new Date(startedAt)) / 60000)));
 
   const fare = await pricingService.calculateFare(distanceKm, waitingTimeMinutes, booking.vehicleType, surgeMultiplier, discount);
   const { commission, driverEarnings } = await commissionService.calculateCommission(fare, Number(process.env.COMMISSION_RATE || 0.15));
@@ -110,17 +119,36 @@ async function completeTrip(bookingId, endLocation, options = {}) {
     {
       $set: {
         fare,
+        // Keep both legacy and spec-compliant distance fields
         distance: distanceKm,
+        distanceKm,
         waitingTime: waitingTimeMinutes,
+        duration: durationMinutes,
+        commission,
         vehicleType: booking.vehicleType,
         startedAt,
         completedAt,
         status: 'completed',
+        endLocation: endLocation || booking.dropoff || undefined,
+        // Keep legacy alias updated for compatibility
         dropoffLocation: endLocation || booking.dropoff || undefined
       }
     },
     { upsert: true, setDefaultsOnInsert: true }
   );
+
+  // Rewards awarding (best-effort, no failure propagation)
+  try {
+    const points = Math.floor((Number(distanceKm) || 0) / 2) * 10; // 10 points per 2km
+    if (points > 0) {
+      if (Passenger && booking.passengerId) {
+        await Passenger.updateOne({ _id: booking.passengerId }, { $inc: { rewardPoints: points } });
+      }
+      if (Driver && booking.driverId) {
+        await Driver.updateOne({ _id: booking.driverId }, { $inc: { rewardPoints: points } });
+      }
+    }
+  } catch (_) {}
 
   return booking;
 }
