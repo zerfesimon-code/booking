@@ -93,12 +93,17 @@
       passengerId: { type: String }, // From User Service
       status: {
         type: String,
-        enum: ['requested', 'accepted', 'ongoing', 'completed', 'canceled'],
+        // Support both legacy and spec statuses to avoid breaking existing code
+        enum: ['requested', 'accepted', 'ongoing', 'completed', 'canceled', 'started', 'in-progress', 'cancelled'],
         default: 'ongoing',
       },
 
+      // Fare and accounting
       fare: { type: Number },
+      commission: { type: Number },
+      // Keep legacy distance for compatibility and add distanceKm per spec
       distance: { type: Number },
+      distanceKm: { type: Number },
       duration: { type: Number },
       waitingTime: { type: Number },
       vehicleType: { type: String },
@@ -106,6 +111,18 @@
       // Live path points (for distance computation)
       locations: [{ lat: Number, lng: Number, timestamp: Date }],
 
+      // Preferred spec-compliant fields
+      startLocation: {
+        latitude: Number,
+        longitude: Number,
+        address: String,
+      },
+      endLocation: {
+        latitude: Number,
+        longitude: Number,
+        address: String,
+      },
+      // Legacy aliases (kept for backward compatibility)
       pickupLocation: {
         latitude: Number,
         longitude: Number,
