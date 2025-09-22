@@ -24,7 +24,6 @@ This document lists all Socket.IO events in the system, who emits them, required
     3) Join room `booking:{bookingId}`
     4) Emit to requester: `booking:created` { bookingId }
     5) Find nearby drivers and send targeted messages `booking:new` to `driver:{driverId}`
-    6) Broadcast summary via `bookingEvents.emitBookingCreatedToNearestPassengers`
 
 - Event: `booking_accept`
   - Emitter: Driver
@@ -62,6 +61,30 @@ This document lists all Socket.IO events in the system, who emits them, required
 
 ---
 
+### Booking Domain (Server Emits)
+
+- Event: `booking:status`
+  - Target: Requesting socket
+  - Payload: `{ bookingId, status, driverId, passengerId, vehicleType, pickup, dropoff }`
+
+- Event: `booking:ETA_update`
+  - Target: Room `booking:{bookingId}`
+  - Payload: `{ bookingId, etaMinutes, message?, driverId, timestamp }`
+
+- Event: `trip_started`
+  - Target: Room `booking:{bookingId}`
+  - Payload: `{ bookingId, startedAt, startLocation }`
+
+- Event: `trip_ongoing`
+  - Target: Room `booking:{bookingId}`
+  - Payload: `{ bookingId, location }`
+
+- Event: `trip_completed`
+  - Target: Room `booking:{bookingId}`
+  - Payload: `{ bookingId, amount, distance, waitingTime, completedAt, driverEarnings, commission }`
+
+---
+
 ### Driver Domain
 
 - Event: `driver:availability`
@@ -79,7 +102,8 @@ This document lists all Socket.IO events in the system, who emits them, required
   - Workflow:
     1) Update last known location via `driverService.updateLocation`
     2) Broadcast `driver:location` and `driver:position` with latest coordinates via `driverEvents`
-    3) If `bookingId` context is used, downstream services may persist to Live tracking (see Live domain) and emit booking-scoped updates
+    3) Also emit driver-scoped channel `driver:location:{driverId}` with same payload
+    4) If `bookingId` context is used, downstream services may persist to Live tracking (see Live domain) and emit booking-scoped updates
 
 ---
 
@@ -143,6 +167,11 @@ This document lists all Socket.IO events in the system, who emits them, required
   - Emitter: Server (events/driverEvents) to `driver:{driverId}` room
   - Payload: `{ driverId, available }`
 
+- Event: `driver:location:{driverId}`
+  - Emitter: Server (events/driverEvents)
+  - Payload: `{ driverId, vehicleType, available, lastKnownLocation, updatedAt }`
+  - Notes: Dynamic, targets a specific driver's public channel
+
 ---
 
 ### Rooms
@@ -150,4 +179,13 @@ This document lists all Socket.IO events in the system, who emits them, required
 - `driver:{driverId}`: A driver-specific channel for targeted messages
 - `passenger:{passengerId}`: A passenger-specific channel for targeted messages
 - `drivers`: Broadcast room for all connected drivers
+
+---
+
+### Common Error Event
+
+- Event: `booking_error`
+  - Emitter: Server (to requesting socket)
+  - Payload: `{ message: string, source?: string, bookingId?: string }`
+  - Notes: Emitted on validation/auth failures across booking and driver flows
 
