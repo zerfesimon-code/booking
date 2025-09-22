@@ -5,60 +5,85 @@ const { Commission, DriverEarnings, AdminEarnings, Payout } = require('../models
 const { DailyReport, WeeklyReport, MonthlyReport, Complaint } = require('../models/analytics');
 
 // Dashboard Statistics
+// Dashboard Statistics
 exports.getDashboardStats = async (req, res) => {
   try {
+    console.log("[getDashboardStats] fetching dashboard data...");
+
     const today = dayjs().startOf('day').toDate();
     const thisWeek = dayjs().startOf('week').toDate();
     const thisMonth = dayjs().startOf('month').toDate();
 
     // Total counts
     const totalRides = await Booking.countDocuments();
+    console.log("[getDashboardStats] totalRides:", totalRides);
+
     const totalEarnings = await Booking.aggregate([
       { $match: { status: 'completed' } },
       { $group: { _id: null, total: { $sum: '$fareFinal' } } }
     ]);
+    console.log("[getDashboardStats] totalEarnings (agg):", totalEarnings);
+
     const totalUsers = await Passenger.countDocuments();
+    console.log("[getDashboardStats] totalUsers:", totalUsers);
+
     const totalDrivers = await Driver.countDocuments();
+    console.log("[getDashboardStats] totalDrivers:", totalDrivers);
+
     const totalCars = await Driver.countDocuments();
+    console.log("[getDashboardStats] totalCars:", totalCars);
+
     const totalComplaints = await Complaint.countDocuments();
+    console.log("[getDashboardStats] totalComplaints:", totalComplaints);
 
     // Today's stats
     const todayRides = await Booking.countDocuments({
       createdAt: { $gte: today }
     });
+    console.log("[getDashboardStats] todayRides:", todayRides);
+
     const todayEarnings = await Booking.aggregate([
       { $match: { status: 'completed', createdAt: { $gte: today } } },
       { $group: { _id: null, total: { $sum: '$fareFinal' } } }
     ]);
+    console.log("[getDashboardStats] todayEarnings (agg):", todayEarnings);
 
     // This week's stats
     const weekRides = await Booking.countDocuments({
       createdAt: { $gte: thisWeek }
     });
+    console.log("[getDashboardStats] weekRides:", weekRides);
+
     const weekEarnings = await Booking.aggregate([
       { $match: { status: 'completed', createdAt: { $gte: thisWeek } } },
       { $group: { _id: null, total: { $sum: '$fareFinal' } } }
     ]);
+    console.log("[getDashboardStats] weekEarnings (agg):", weekEarnings);
 
     // This month's stats
     const monthRides = await Booking.countDocuments({
       createdAt: { $gte: thisMonth }
     });
+    console.log("[getDashboardStats] monthRides:", monthRides);
+
     const monthEarnings = await Booking.aggregate([
       { $match: { status: 'completed', createdAt: { $gte: thisMonth } } },
       { $group: { _id: null, total: { $sum: '$fareFinal' } } }
     ]);
+    console.log("[getDashboardStats] monthEarnings (agg):", monthEarnings);
 
     // Commission stats
     const totalCommission = await AdminEarnings.aggregate([
       { $group: { _id: null, total: { $sum: '$commissionEarned' } } }
     ]);
+    console.log("[getDashboardStats] totalCommission (agg):", totalCommission);
 
     // Pending payouts
     const pendingPayouts = await Payout.aggregate([
       { $match: { status: 'pending' } },
       { $group: { _id: null, total: { $sum: '$netPayout' } } }
     ]);
+    console.log("[getDashboardStats] pendingPayouts (agg):", pendingPayouts);
 
     res.json({
       overview: {
@@ -85,9 +110,11 @@ exports.getDashboardStats = async (req, res) => {
       }
     });
   } catch (e) {
+    console.error("[getDashboardStats] error:", e);
     res.status(500).json({ message: `Failed to get dashboard stats: ${e.message}` });
   }
 };
+
 
 // Revenue Reports
 exports.getDailyReport = async (req, res) => {
@@ -329,45 +356,72 @@ exports.getCommission = async (req, res) => {
   }
 };
 
-// Ride History
+// Ride History (integrated with TripHistory + Bookings, with date/status filters)
 exports.getRideHistory = async (req, res) => {
   try {
     const userType = req.user.type;
-    const userId = req.user.id;
-    const { page = 1, limit = 10, status } = req.query;
+    const userId = String(req.user.id);
+    const { page = 1, limit = 10, status, dateFrom, dateTo } = req.query;
 
-    let query = {};
-    if (userType === 'driver') {
-      query.driverId = userId;
-    } else if (userType === 'passenger') {
-      query.passengerId = userId;
+    // TripHistory is the source of truth for lifecycle + timing
+    const tripMatch = {};
+    if (userType === 'driver') tripMatch.driverId = userId;
+    if (userType === 'passenger') tripMatch.passengerId = userId;
+    if (status) tripMatch.status = status;
+    if (dateFrom || dateTo) {
+      const from = dateFrom ? new Date(dateFrom) : new Date();
+      const to = dateTo ? new Date(dateTo) : new Date();
+      // Prefer completedAt/startTime/dateOfTravel when available
+      tripMatch.$or = [
+        { completedAt: { $gte: from, $lte: to } },
+        { startedAt: { $gte: from, $lte: to } },
+        { dateOfTravel: { $gte: from, $lte: to } }
+      ];
     }
 
-    if (status) {
-      query.status = status;
-    }
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const rides = await Booking.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .lean();
+    // Aggregate TripHistory with corresponding Booking document
+    const pipeline = [
+      { $match: tripMatch },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: parseInt(limit) },
+      { $lookup: { from: 'bookings', localField: 'bookingId', foreignField: '_id', as: 'booking' } },
+      { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
+    ];
 
-    // enrich driver basic info via external service using externalId when present
-    const { getDriversByIds } = require('../integrations/userServiceClient');
-    const driverExternalIds = [...new Set(rides.map(r => r.driverId).filter(Boolean))].map(String);
+    const [rows, totalCount] = await Promise.all([
+      TripHistory.aggregate(pipeline),
+      TripHistory.countDocuments(tripMatch)
+    ]);
+
+    // External driver enrichment (best-effort)
     let driverInfoMap = {};
-    if (driverExternalIds.length) {
-      try {
-        const infos = await getDriversByIds(driverExternalIds, req.headers.authorization);
-        driverInfoMap = Object.fromEntries(infos.map(i => [String(i.id), { id: String(i.id), name: i.name, phone: i.phone }]));
-      } catch (_) {}
-    }
+    try {
+      const { getDriversByIds } = require('../integrations/userServiceClient');
+      const driverIds = [...new Set(rows.map(r => r.driverId).filter(Boolean))];
+      if (driverIds.length) {
+        const infos = await getDriversByIds(driverIds, { headers: req.headers.authorization ? { Authorization: req.headers.authorization } : undefined });
+        driverInfoMap = Object.fromEntries((infos || []).map(i => [String(i.id), { id: String(i.id), name: i.name, phone: i.phone }]));
+      }
+    } catch (_) {}
 
-    const total = await Booking.countDocuments(query);
-
-    const data = rides.map(r => ({
-      ...r,
+    const data = rows.map(r => ({
+      id: String(r._id),
+      bookingId: String(r.bookingId),
+      status: r.status,
+      fare: r.fare ?? r.booking?.fareFinal ?? r.booking?.fareEstimated,
+      distanceKm: r.distance ?? r.booking?.distanceKm,
+      waitingTime: r.waitingTime,
+      vehicleType: r.vehicleType ?? r.booking?.vehicleType,
+      startedAt: r.startedAt ?? r.startTime,
+      completedAt: r.completedAt ?? r.endTime,
+      pickup: r.booking?.pickup,
+      dropoff: r.booking?.dropoff,
+      dropoffLocation: r.dropoffLocation,
+      passenger: r.booking ? { id: String(r.booking.passengerId), name: r.booking.passengerName, phone: r.booking.passengerPhone } : undefined,
+      driverId: r.driverId && String(r.driverId),
       driver: r.driverId ? driverInfoMap[String(r.driverId)] : undefined
     }));
 
@@ -375,8 +429,8 @@ exports.getRideHistory = async (req, res) => {
       rides: data,
       pagination: {
         current: parseInt(page),
-        pages: Math.ceil(total / limit),
-        total
+        pages: Math.ceil(totalCount / parseInt(limit)),
+        total: totalCount
       }
     });
   } catch (e) {
@@ -384,49 +438,75 @@ exports.getRideHistory = async (req, res) => {
   }
 };
 
-// Get trip history by user ID (for user service integration)
+// Get trip history by user ID (integrated with TripHistory + Bookings)
 exports.getTripHistoryByUserId = async (req, res) => {
   try {
     const { userType, userId } = req.params;
-    const { status } = req.query;
+    const { status, page = 1, limit = 20 } = req.query;
 
     if (!userType || !userId) {
       return res.status(400).json({ message: 'userType and userId are required' });
     }
-
     if (userType !== 'driver' && userType !== 'passenger') {
       return res.status(400).json({ message: 'userType must be either driver or passenger' });
     }
 
-    let query = {};
-    if (userType === 'driver') {
-      query.driverId = userId;
-    } else if (userType === 'passenger') {
-      query.passengerId = userId;
-    }
+    const tripMatch = {};
+    if (userType === 'driver') tripMatch.driverId = String(userId);
+    if (userType === 'passenger') tripMatch.passengerId = String(userId);
+    if (status) tripMatch.status = status;
 
-    if (status) {
-      query.status = status;
-    }
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const pipeline = [
+      { $match: tripMatch },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: parseInt(limit) },
+      { $lookup: { from: 'bookings', localField: 'bookingId', foreignField: '_id', as: 'booking' } },
+      { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
+    ];
 
-    const trips = await Booking.find(query).sort({ createdAt: -1 }).lean();
+    const [rows, totalCount] = await Promise.all([
+      TripHistory.aggregate(pipeline),
+      TripHistory.countDocuments(tripMatch)
+    ]);
 
-    const { getDriversByIds } = require('../integrations/userServiceClient');
-    const driverExternalIds = [...new Set(trips.map(r => r.driverId).filter(Boolean))].map(String);
     let driverInfoMap = {};
-    if (driverExternalIds.length) {
-      try {
-        const infos = await getDriversByIds(driverExternalIds, req.headers.authorization);
-        driverInfoMap = Object.fromEntries(infos.map(i => [String(i.id), { id: String(i.id), name: i.name, phone: i.phone }]));
-      } catch (_) {}
-    }
+    try {
+      const { getDriversByIds } = require('../integrations/userServiceClient');
+      const driverIds = [...new Set(rows.map(r => r.driverId).filter(Boolean))];
+      if (driverIds.length) {
+        const infos = await getDriversByIds(driverIds, { headers: req.headers.authorization ? { Authorization: req.headers.authorization } : undefined });
+        driverInfoMap = Object.fromEntries((infos || []).map(i => [String(i.id), { id: String(i.id), name: i.name, phone: i.phone }]));
+      }
+    } catch (_) {}
 
-    const data = trips.map(t => ({
-      ...t,
-      driver: t.driverId ? driverInfoMap[String(t.driverId)] : undefined
+    const trips = rows.map(r => ({
+      id: String(r._id),
+      bookingId: String(r.bookingId),
+      status: r.status,
+      fare: r.fare ?? r.booking?.fareFinal ?? r.booking?.fareEstimated,
+      distanceKm: r.distance ?? r.booking?.distanceKm,
+      waitingTime: r.waitingTime,
+      vehicleType: r.vehicleType ?? r.booking?.vehicleType,
+      startedAt: r.startedAt ?? r.startTime,
+      completedAt: r.completedAt ?? r.endTime,
+      pickup: r.booking?.pickup,
+      dropoff: r.booking?.dropoff,
+      dropoffLocation: r.dropoffLocation,
+      passenger: r.booking ? { id: String(r.booking.passengerId), name: r.booking.passengerName, phone: r.booking.passengerPhone } : undefined,
+      driverId: r.driverId && String(r.driverId),
+      driver: r.driverId ? driverInfoMap[String(r.driverId)] : undefined
     }));
 
-    res.json({ trips: data });
+    res.json({
+      trips,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(totalCount / parseInt(limit)),
+        total: totalCount
+      }
+    });
   } catch (e) {
     res.status(500).json({ message: `Failed to get trip history: ${e.message}` });
   }

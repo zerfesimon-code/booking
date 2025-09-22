@@ -1,9 +1,11 @@
 const { Live } = require('../models/bookingModels');
 const { sendMessageToSocketId } = require('./utils');
+const logger = require('../utils/logger');
 
 module.exports = (io, socket) => {
   // booking:status_request passthrough
   socket.on('booking:status_request', async (payload) => {
+    logger.info('[booking:status_request] received', { socketId: socket.id, payload });
     try {
       const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
       const bookingId = String(data.bookingId || '');
@@ -20,15 +22,19 @@ module.exports = (io, socket) => {
         pickup: booking.pickup,
         dropoff: booking.dropoff
       });
+      logger.info('[booking:status_request] responded', { bookingId: String(booking._id) });
     } catch (err) {
+      logger.error('[booking:status_request] error', err);
       socket.emit('booking_error', { message: 'Failed to fetch booking status', source: 'booking:status_request' });
     }
   });
 
   // booking:ETA_update
   socket.on('booking:ETA_update', async (payload) => {
+    logger.info('[booking:ETA_update] received', { socketId: socket.id, payload });
     try {
       if (!socket.user || String(socket.user.type).toLowerCase() !== 'driver') {
+        logger.warn('[booking:ETA_update] unauthorized attempt', { socketId: socket.id });
         return socket.emit('booking_error', { message: 'Unauthorized: driver token required', source: 'booking:ETA_update' });
       }
       const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
@@ -42,7 +48,9 @@ module.exports = (io, socket) => {
       if (String(booking.driverId || '') !== String(socket.user.id)) return socket.emit('booking_error', { message: 'Only assigned driver can send ETA', source: 'booking:ETA_update' });
       const out = { bookingId: String(booking._id), etaMinutes, message, driverId: String(socket.user.id), timestamp: new Date().toISOString() };
       sendMessageToSocketId(`booking:${String(booking._id)}`, { event: 'booking:ETA_update', data: out });
+      logger.info('[booking:ETA_update] forwarded', { bookingId: String(booking._id), driverId: String(socket.user.id), etaMinutes });
     } catch (err) {
+      logger.error('[booking:ETA_update] error', err);
       socket.emit('booking_error', { message: 'Failed to process ETA update', source: 'booking:ETA_update' });
     }
   });

@@ -94,12 +94,17 @@
       status: {
         type: String,
         enum: ['requested', 'accepted', 'ongoing', 'completed', 'canceled'],
-        required: true,
+        default: 'ongoing',
       },
 
       fare: { type: Number },
       distance: { type: Number },
       duration: { type: Number },
+      waitingTime: { type: Number },
+      vehicleType: { type: String },
+
+      // Live path points (for distance computation)
+      locations: [{ lat: Number, lng: Number, timestamp: Date }],
 
       pickupLocation: {
         latitude: Number,
@@ -114,6 +119,9 @@
 
       startTime: { type: Date },
       endTime: { type: Date },
+      // Timestamps aligned with lifecycle service
+      startedAt: { type: Date },
+      completedAt: { type: Date },
       dateOfTravel: { type: Date, default: Date.now },
       notes: { type: String },
     },

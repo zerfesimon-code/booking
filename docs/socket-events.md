@@ -23,8 +23,8 @@ This document lists all Socket.IO events in the system, who emits them, required
     2) Create booking via `bookingService.createBooking`
     3) Join room `booking:{bookingId}`
     4) Emit to requester: `booking:created` { bookingId }
-    5) Find nearby drivers and send targeted messages `booking:new` to `driver:{driverId}`
-    6) Broadcast summary via `bookingEvents.emitBookingCreatedToNearestPassengers`
+    5) Find nearby drivers and send targeted messages `booking:new` and `booking:nearby` to `driver:{driverId}`
+    6) Broadcasts and driver notifications via `events/bookingEvents`
 
 - Event: `booking_accept`
   - Emitter: Driver
@@ -43,6 +43,33 @@ This document lists all Socket.IO events in the system, who emits them, required
   - Workflow:
     1) Update lifecycle via `bookingService.updateBookingLifecycle(..., status:'canceled')`
     2) Broadcast `booking:update` with { status:'canceled', canceledBy, canceledReason }
+
+- Event: `trip_started`
+  - Emitter: Driver
+  - Auth: Driver
+  - Payload: `{ bookingId, startLocation? | location? }`
+  - Workflow:
+    1) Validate booking belongs to driver
+    2) Persist trip start via `services/bookingLifecycleService.startTrip`
+    3) Broadcast via `bookingEvents.emitTripStarted`
+
+- Event: `trip_ongoing`
+  - Emitter: Driver
+  - Auth: Driver
+  - Payload: `{ bookingId, location: { latitude, longitude } }`
+  - Workflow:
+    1) Validate booking belongs to driver
+    2) Append GPS point via `services/bookingLifecycleService.updateTripLocation`
+    3) Broadcast via `bookingEvents.emitTripOngoing`
+
+- Event: `trip_completed`
+  - Emitter: Driver
+  - Auth: Driver
+  - Payload: `{ bookingId, endLocation? | location?, surgeMultiplier?, discount?, debitPassengerWallet? }`
+  - Workflow:
+    1) Validate booking belongs to driver
+    2) Compute fare, commission, credit wallets via `services/bookingLifecycleService.completeTrip`
+    3) Broadcast via `bookingEvents.emitTripCompleted`
 
 - Event: `booking:status_request`
   - Emitter: Driver or Passenger
@@ -70,7 +97,7 @@ This document lists all Socket.IO events in the system, who emits them, required
   - Payload: `{ available: boolean }`
   - Workflow:
     1) Update availability via `driverService.setAvailability`
-    2) Emit to room `driver:{driverId}`: `driver:availability` { driverId, available }
+    2) Broadcast via `events/driverEvents.emitDriverAvailability`
 
 - Event: `booking:driver_location_update`
   - Emitter: Driver
@@ -127,6 +154,12 @@ This document lists all Socket.IO events in the system, who emits them, required
   - Emitter: Server (events/bookingEvents)
   - Payload: `{ bookingId, driverId }`
 
+- Event: `booking:nearby`
+  - Emitter: Server (sockets/bookingSocket)
+  - Target: Nearby drivers only (sent directly to `driver:{driverId}`)
+  - Payload: `{ bookingId, patch: { status:'requested', passengerId, vehicleType, pickup, dropoff, passenger } }`
+  - Notes: Duplicate of `booking:new` for clients that prefer the `booking:nearby` name
+
 ---
 
 ### Driver Domain (Broadcasts)
@@ -150,4 +183,9 @@ This document lists all Socket.IO events in the system, who emits them, required
 - `driver:{driverId}`: A driver-specific channel for targeted messages
 - `passenger:{passengerId}`: A passenger-specific channel for targeted messages
 - `drivers`: Broadcast room for all connected drivers
+
+---
+
+Logging
+- All socket event handlers now log on receipt, success, warn on unauthorized, and error on failure. See `sockets/*.js` for details.
 

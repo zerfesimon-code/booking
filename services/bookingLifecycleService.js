@@ -21,10 +21,11 @@ async function startTrip(bookingId, startLocation) {
         passengerId: booking.passengerId,
         vehicleType: booking.vehicleType,
         startedAt: booking.startedAt,
+        status: 'ongoing',
         locations: []
       }
     },
-    { upsert: true, new: true }
+    { upsert: true, new: true, setDefaultsOnInsert: true }
   );
   return booking;
 }
@@ -113,10 +114,12 @@ async function completeTrip(bookingId, endLocation, options = {}) {
         waitingTime: waitingTimeMinutes,
         vehicleType: booking.vehicleType,
         startedAt,
-        completedAt
+        completedAt,
+        status: 'completed',
+        dropoffLocation: endLocation || booking.dropoff || undefined
       }
     },
-    { upsert: true }
+    { upsert: true, setDefaultsOnInsert: true }
   );
 
   return booking;
