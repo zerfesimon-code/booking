@@ -276,7 +276,7 @@ async function updateBookingLifecycle({ requester, id, status }) {
       const commissionRate = commission ? commission.percentage : 15;
       const grossFare = booking.fareFinal || booking.fareEstimated;
       const commissionAmount = financeService.calculateCommission(grossFare, commissionRate);
-      const netEarnings = financeService.calculateNetIncome(grossFare, commissionRate);
+      const netEarnings = grossFare - commissionAmount;
       await DriverEarnings.create({
         driverId: booking.driverId,
         bookingId: booking._id,

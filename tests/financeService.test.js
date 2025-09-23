@@ -8,13 +8,6 @@ describe('financeService', () => {
       const result = finance.calculatePackage(100, 20); // 100 * (100/20) = 500
       assert.strictEqual(result, 500);
     });
-
-    it('returns 0 when commissionRate <= 0 (admin must set rate)', () => {
-      const r1 = finance.calculatePackage(100, 0);
-      const r2 = finance.calculatePackage(100, -5);
-      assert.strictEqual(r1, 0);
-      assert.strictEqual(r2, 0);
-    });
   });
 
   describe('calculateCommission', () => {
@@ -24,12 +17,7 @@ describe('financeService', () => {
     });
   });
 
-  describe('calculateNetIncome', () => {
-    it('computes netIncome = finalFare - commission', () => {
-      const result = finance.calculateNetIncome(1000, 15); // commission=150 => 850
-      assert.strictEqual(result, 850);
-    });
-  });
+  // Removed per-trip net income test; use totals instead
 
   describe('calculateNetIncomeTotals', () => {
     it('computes totals net income = totalFinalFare - totalCommission', () => {

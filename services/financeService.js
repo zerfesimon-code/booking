@@ -32,19 +32,6 @@ function calculateCommission(finalFare, commissionRate) {
   return (fare * rate) / 100;
 }
 
-/**
- * Calculate driver's net income from the final fare.
- * - Formula: netIncome = finalFare - calculateCommission(finalFare, commissionRate)
- *
- * @param {number} finalFare
- * @param {number} commissionRate
- * @returns {number}
- */
-function calculateNetIncome(finalFare, commissionRate) {
-  const fare = toNumber(finalFare, 0);
-  const commission = calculateCommission(fare, commissionRate);
-  return fare - commission;
-}
 
 /**
  * Determine if a driver can accept a booking based on package balance.
@@ -63,7 +50,6 @@ function canAcceptBooking(packageBalance, finalFare) {
 module.exports = {
   calculatePackage,
   calculateCommission,
-  calculateNetIncome,
   canAcceptBooking,
   /**
    * Compute net income from totals: total fare minus total commission accumulated.

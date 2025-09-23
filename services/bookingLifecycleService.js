@@ -94,7 +94,7 @@ async function completeTrip(bookingId, endLocation, options = {}) {
   const commissionDoc = await Commission.findOne({ isActive: true }).sort({ createdAt: -1 });
   const commissionRate = commissionDoc ? commissionDoc.percentage : Number(process.env.COMMISSION_RATE || 15);
   const commission = financeService.calculateCommission(fare, commissionRate);
-  const driverEarnings = financeService.calculateNetIncome(fare, commissionRate);
+  const driverEarnings = fare - commission;
 
   // Update booking
   booking.status = 'completed';
