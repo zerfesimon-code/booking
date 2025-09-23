@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "start:all": "node server.js"
+    "start:all": "node server.js",
+    "test": "mocha \"tests/**/*.test.js\""
   },
   "keywords": [],
   "author": "",
@@ -36,6 +37,7 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.10",
-    "npm-run-all": "^4.1.5"
+    "npm-run-all": "^4.1.5",
+    "mocha": "^10.7.3"
   }
 }

@@ -106,16 +106,7 @@ async function completeTrip(bookingId, endLocation, options = {}) {
   booking.driverEarnings = driverEarnings;
   await booking.save();
 
-  // Wallet operations (best effort)
-  try {
-    if (booking.driverId) await walletService.credit(booking.driverId, driverEarnings, 'Trip earnings');
-  } catch (_) {}
-  try {
-    if (adminUserId) await walletService.credit(adminUserId, commission, 'Commission from trip');
-  } catch (_) {}
-  try {
-    if (debitPassengerWallet && booking.passengerId) await walletService.debit(booking.passengerId, fare, 'Trip fare');
-  } catch (_) {}
+  // Wallet operations removed per finance refactor (no automatic credits/debits here)
 
   // Persist trip summary
   await TripHistory.findOneAndUpdate(
@@ -159,16 +150,7 @@ async function completeTrip(bookingId, endLocation, options = {}) {
     });
   } catch (_) {}
 
-  // Rewards: add ETB 10 per 10 km for both driver & passenger
-  try {
-    const rewardPer10Km = 10;
-    const rewardUnits = Math.floor((distanceKm || 0) / 10);
-    const reward = rewardUnits * rewardPer10Km;
-    if (reward > 0) {
-      if (booking.driverId) await walletService.credit(booking.driverId, reward, 'Reward points for distance');
-      if (booking.passengerId) await walletService.credit(booking.passengerId, reward, 'Reward points for distance');
-    }
-  } catch (_) {}
+  // Rewards removed per finance refactor
 
   // Broadcast lifecycle updates for admin dashboard
   try {
