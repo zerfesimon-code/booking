@@ -31,6 +31,18 @@ describe('financeService', () => {
     });
   });
 
+  describe('calculateNetIncomeTotals', () => {
+    it('computes totals net income = totalFinalFare - totalCommission', () => {
+      const net = finance.calculateNetIncomeTotals(10000, 1500);
+      assert.strictEqual(net, 8500);
+    });
+    it('handles zeros and negatives gracefully', () => {
+      assert.strictEqual(finance.calculateNetIncomeTotals(0, 0), 0);
+      assert.strictEqual(finance.calculateNetIncomeTotals(5000, 0), 5000);
+      assert.strictEqual(finance.calculateNetIncomeTotals(5000, -100), 5100);
+    });
+  });
+
   describe('canAcceptBooking', () => {
     it('returns true when packageBalance > estimatefare', () => {
       assert.strictEqual(finance.canAcceptBooking(200, 150), true);
