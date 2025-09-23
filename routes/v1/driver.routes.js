@@ -37,4 +37,8 @@ router.get('/estimate-fare/:bookingId', authenticate, authorize('driver'), ctrl.
 // Combined discover + estimate
 router.post('/discover-and-estimate', authenticate, ctrl.discoverAndEstimate);
 
+// Payment options via driver route namespace (alternative path)
+router.get('/payment-options', authenticate, ctrl.listPaymentOptions);
+router.post('/payment-preference', authenticate, authorize('driver'), ctrl.setPaymentPreference);
+
 module.exports = router;

@@ -45,6 +45,11 @@ const DriverSchema = new mongoose.Schema({
   // Rating information
   rating: { type: Number, default: 5.0, min: 1, max: 5 },
   ratingCount: { type: Number, default: 0 },
+  paymentPreference: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PaymentOption',
+    default: null
+  },
   roles: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Role' }]
 }, { timestamps: true, _id: false, toJSON: { versionKey: false }, toObject: { versionKey: false } });
 
