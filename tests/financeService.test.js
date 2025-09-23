@@ -9,43 +9,35 @@ describe('financeService', () => {
       assert.strictEqual(result, 500);
     });
 
-    it('falls back to PROVIDER_MULTIPLIER when rate is 0', () => {
-      const prev = process.env.PROVIDER_MULTIPLIER;
-      process.env.PROVIDER_MULTIPLIER = '120';
-      const result = finance.calculatePackage(100, 0); // 100 * (120/100) = 120
-      assert.strictEqual(result, 120);
-      process.env.PROVIDER_MULTIPLIER = prev;
-    });
-
-    it('defaults multiplier to 100 when env missing', () => {
-      const prev = process.env.PROVIDER_MULTIPLIER;
-      delete process.env.PROVIDER_MULTIPLIER;
-      const result = finance.calculatePackage(200, undefined); // 200 * (100/100) = 200
-      assert.strictEqual(result, 200);
-      process.env.PROVIDER_MULTIPLIER = prev;
+    it('returns 0 when commissionRate <= 0 (admin must set rate)', () => {
+      const r1 = finance.calculatePackage(100, 0);
+      const r2 = finance.calculatePackage(100, -5);
+      assert.strictEqual(r1, 0);
+      assert.strictEqual(r2, 0);
     });
   });
 
   describe('calculateCommission', () => {
-    it('computes commission = (finalFare * commissionRate) / 1000', () => {
-      const result = finance.calculateCommission(1000, 15); // 1000*15/1000 = 15
-      assert.strictEqual(result, 15);
+    it('computes commission = (finalFare * commissionRate) / 100', () => {
+      const result = finance.calculateCommission(1000, 15); // 1000*15/100 = 150
+      assert.strictEqual(result, 150);
     });
   });
 
   describe('calculateNetIncome', () => {
     it('computes netIncome = finalFare - commission', () => {
-      const result = finance.calculateNetIncome(1000, 15); // 1000 - 15 = 985
-      assert.strictEqual(result, 985);
+      const result = finance.calculateNetIncome(1000, 15); // commission=150 => 850
+      assert.strictEqual(result, 850);
     });
   });
 
   describe('canAcceptBooking', () => {
-    it('returns true when packageBalance >= finalFare', () => {
+    it('returns true when packageBalance > estimatefare', () => {
       assert.strictEqual(finance.canAcceptBooking(200, 150), true);
     });
-    it('returns false when packageBalance < finalFare', () => {
+    it('returns false when packageBalance < esttimatesare', () => {
       assert.strictEqual(finance.canAcceptBooking(100, 150), false);
+      assert.strictEqual(finance.canAcceptBooking(150, 150), false);
     });
   });
 });

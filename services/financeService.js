@@ -9,26 +9,18 @@ function toNumber(value, fallback = 0) {
 /**
  * Calculate provider package value from a deposit amount and commission rate.
  * - Formula: package = providerAmount * (100 / commissionRate)
- * - Fallback: when commissionRate is missing/invalid, multiply by PROVIDER_MULTIPLIER (default 100%)
- *
- * @param {number} providerAmount
- * @param {number} commissionRate - dynamic percentage (e.g., 15 for 15%)
- * @returns {number}
+ * - Requires a valid, admin-provided commissionRate (> 0)
  */
 function calculatePackage(providerAmount, commissionRate) {
   const amount = toNumber(providerAmount, 0);
   const rate = toNumber(commissionRate, 0);
-  if (rate > 0) {
-    return amount * (100 / rate);
-  }
-  const providerMultiplier = toNumber(process.env.PROVIDER_MULTIPLIER, 100);
-  // Treat multiplier as percent; e.g., 100 means x1.0, 120 means x1.2
-  return amount * (providerMultiplier / 100);
+  if (rate <= 0) return 0;
+  return amount * (100 / rate);
 }
 
 /**
  * Calculate commission earned by platform from the final fare.
- * - Formula: commission = (finalFare * commissionRate) / 1000
+ * - Formula: commission = (finalFare * commissionRate) / 100
  *
  * @param {number} finalFare
  * @param {number} commissionRate - dynamic percentage (e.g., 15 for 15%)
@@ -37,7 +29,7 @@ function calculatePackage(providerAmount, commissionRate) {
 function calculateCommission(finalFare, commissionRate) {
   const fare = toNumber(finalFare, 0);
   const rate = toNumber(commissionRate, 0);
-  return (fare * rate) / 1000;
+  return (fare * rate) / 100;
 }
 
 /**
@@ -56,7 +48,7 @@ function calculateNetIncome(finalFare, commissionRate) {
 
 /**
  * Determine if a driver can accept a booking based on package balance.
- * - Logic: return packageBalance >= finalFare
+ * - Logic: return packageBalance > finalFare
  *
  * @param {number} packageBalance
  * @param {number} finalFare
@@ -65,7 +57,7 @@ function calculateNetIncome(finalFare, commissionRate) {
 function canAcceptBooking(packageBalance, finalFare) {
   const balance = toNumber(packageBalance, 0);
   const fare = toNumber(finalFare, 0);
-  return balance >= fare;
+  return balance > fare;
 }
 
 module.exports = {
