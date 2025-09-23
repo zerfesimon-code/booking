@@ -286,7 +286,28 @@ async function updateBookingLifecycle({ requester, id, status }) {
         netEarnings,
         commissionPercentage: commissionRate
       });
-      // Wallet credits removed per finance refactor
+      try {
+        const session = await mongoose.startSession();
+        await session.withTransaction(async () => {
+          await Wallet.updateOne(
+            { userId: String(booking.driverId), role: 'driver' },
+            { $inc: { balance: netEarnings, totalEarnings: netEarnings } },
+            { upsert: true, session }
+          );
+          await Transaction.create([
+            {
+              userId: String(booking.driverId),
+              role: 'driver',
+              amount: netEarnings,
+              type: 'credit',
+              method: booking.paymentMethod || 'cash',
+              status: 'success',
+              metadata: { bookingId: String(booking._id), reason: 'Trip earnings (REST)' }
+            }
+          ], { session });
+        });
+        session.endSession();
+      } catch (_) {}
       await AdminEarnings.create({
         bookingId: booking._id,
         tripDate: new Date(),

@@ -106,7 +106,16 @@ async function completeTrip(bookingId, endLocation, options = {}) {
   booking.driverEarnings = driverEarnings;
   await booking.save();
 
-  // Wallet operations removed per finance refactor (no automatic credits/debits here)
+  // Wallet operations (best effort)
+  try {
+    if (booking.driverId) await walletService.credit(booking.driverId, driverEarnings, 'Trip earnings');
+  } catch (_) {}
+  try {
+    if (adminUserId) await walletService.credit(adminUserId, commission, 'Commission from trip');
+  } catch (_) {}
+  try {
+    if (debitPassengerWallet && booking.passengerId) await walletService.debit(booking.passengerId, fare, 'Trip fare');
+  } catch (_) {}
 
   // Persist trip summary
   await TripHistory.findOneAndUpdate(
