@@ -220,7 +220,8 @@ module.exports = {
   listPaymentOptions: async (req, res) => {
     try {
       const rows = await paymentService.getPaymentOptions();
-      return res.json(rows);
+      const data = (rows || []).map(o => ({ id: String(o._id), name: o.name, logo: o.logo }));
+      return res.json(data);
     } catch (e) { errorHandler(res, e); }
   },
   setPaymentPreference: async (req, res) => {
