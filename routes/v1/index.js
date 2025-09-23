@@ -30,6 +30,24 @@ router.use("/live", require("./live.routes"));
 router.use("/pricing", authorize("admin"), require("./pricing.routes"));
 router.use("/admins", authorize("admin"), require("./admin.routes"));
 router.use("/drivers", require("./driver.routes"));
+// Payment options simple router
+router.get('/payment-options', async (req, res) => {
+  try {
+    const ctrl = require('../../controllers/driver.controller');
+    const rows = await require('../../services/paymentService').getPaymentOptions();
+    return res.json(rows);
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+});
+router.post('/driver/payment-preference', authorize('driver'), async (req, res) => {
+  try {
+    const ctrl = require('../../controllers/driver.controller');
+    return await ctrl.setPaymentPreference(req, res);
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+});
 router.use("/mapping", require("./mapping.routes"));
 router.use("/passengers", require("./passenger.routes"));
 router.use("/analytics", require("./analytics.routes"));

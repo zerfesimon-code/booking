@@ -3,6 +3,7 @@ const { crudController } = require('./basic.crud');
 const driverService = require('../services/driverService');
 const driverEvents = require('../events/driverEvents');
 const errorHandler = require('../utils/errorHandler');
+const paymentService = require('../services/paymentService');
 
 const base = {
   ...crudController(Driver),
@@ -57,7 +58,8 @@ const base = {
   get: async (req, res) => {
     try {
       const driver = await Driver.findById(req.params.id)
-        .select('_id name phone email vehicleType available lastKnownLocation rating externalId createdAt updatedAt')
+        .select('_id name phone email vehicleType available lastKnownLocation rating externalId createdAt updatedAt paymentPreference')
+        .populate({ path: 'paymentPreference', select: { name: 1, logo: 1 } })
         .lean();
       
       if (!driver) {
@@ -89,6 +91,11 @@ const base = {
         available: !!driver.available,
         lastKnownLocation: driver.lastKnownLocation || null,
         rating: driver.rating || 5.0,
+        paymentPreference: driver.paymentPreference ? {
+          _id: String(driver.paymentPreference._id),
+          name: driver.paymentPreference.name,
+          logo: driver.paymentPreference.logo
+        } : null,
         createdAt: driver.createdAt,
         updatedAt: driver.updatedAt
       };
@@ -208,7 +215,23 @@ module.exports = {
   updateLocation, 
   availableNearby, 
   estimateFareForPassenger, 
-  estimateFareForDriver 
+  estimateFareForDriver,
+  // Payment options
+  listPaymentOptions: async (req, res) => {
+    try {
+      const rows = await paymentService.getPaymentOptions();
+      return res.json(rows);
+    } catch (e) { errorHandler(res, e); }
+  },
+  setPaymentPreference: async (req, res) => {
+    try {
+      if (!req.user || req.user.type !== 'driver') return res.status(403).json({ message: 'Driver authentication required' });
+      const { paymentOptionId } = req.body || {};
+      if (!paymentOptionId) return res.status(400).json({ message: 'paymentOptionId is required' });
+      const updated = await paymentService.setDriverPaymentPreference(String(req.user.id), paymentOptionId);
+      return res.json(updated);
+    } catch (e) { errorHandler(res, e); }
+  }
 };
 
 // Combined driver discovery and fare estimation for passengers
