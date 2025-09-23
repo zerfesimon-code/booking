@@ -216,9 +216,20 @@ exports.webhook = async (req, res) => {
           ? n(data.adjustedAmount) ?? n(data.amount) ?? tx.amount
           : n(data.amount) ?? n(data.adjustedAmount) ?? tx.amount;
       if (tx.type === "credit") {
+        // If this is a provider deposit for drivers, convert to package using dynamic commissionRate
+        let delta = providerAmount;
+        try {
+          const { Commission } = require("../models/commission");
+          const financeService = require("../services/financeService");
+          const commissionDoc = await Commission.findOne({ isActive: true }).sort({ createdAt: -1 });
+          const commissionRate = commissionDoc ? commissionDoc.percentage : Number(process.env.COMMISSION_RATE || 15);
+          if (tx.role === 'driver') {
+            delta = financeService.calculatePackage(providerAmount, commissionRate);
+          }
+        } catch (_) {}
         await Wallet.updateOne(
           { userId: tx.userId, role: tx.role },
-          { $inc: { balance: providerAmount } },
+          { $inc: { balance: delta } },
           { upsert: true }
         );
       } else if (tx.type === "debit") {

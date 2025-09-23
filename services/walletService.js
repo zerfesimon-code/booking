@@ -12,6 +12,8 @@ try {
   WalletModel = wallet.Wallet;
 }
 
+const financeService = require('./financeService');
+
 async function credit(userId, amount, description = '') {
   if (!WalletModel) return null;
   if (TransactionModel) {
@@ -72,4 +74,14 @@ async function getWallet(userId) {
 }
 
 module.exports = { credit, debit, getWallet };
+
+/**
+ * Convert a provider deposit to package value based on dynamic commission rate.
+ * Does not mutate wallet; returns computed package amount for caller to apply.
+ */
+async function convertProviderDepositToPackage(providerAmount, commissionRate) {
+  return financeService.calculatePackage(providerAmount, commissionRate);
+}
+
+module.exports.convertProviderDepositToPackage = convertProviderDepositToPackage;
 

@@ -4,6 +4,9 @@ const { haversineKm } = require('../utils/distance');
 const pricingService = require('./pricingService');
 const commissionService = require('./commissionService');
 const walletService = require('./walletService');
+const financeService = require('./financeService');
+const { Commission, DriverEarnings, AdminEarnings } = require('../models/commission');
+const { broadcast } = require('../sockets/utils');
 
 async function startTrip(bookingId, startLocation) {
   const booking = await Booking.findById(bookingId);
@@ -26,6 +29,13 @@ async function startTrip(bookingId, startLocation) {
     },
     { upsert: true, new: true }
   );
+  try {
+    broadcast('trip_started', {
+      bookingId: String(booking._id),
+      startedAt: booking.startedAt,
+      startLocation
+    });
+  } catch (_) {}
   return booking;
 }
 
@@ -80,7 +90,11 @@ async function completeTrip(bookingId, endLocation, options = {}) {
   const waitingTimeMinutes = Math.max(0, Math.round(((completedAt - new Date(startedAt)) / 60000)));
 
   const fare = await pricingService.calculateFare(distanceKm, waitingTimeMinutes, booking.vehicleType, surgeMultiplier, discount);
-  const { commission, driverEarnings } = await commissionService.calculateCommission(fare, Number(process.env.COMMISSION_RATE || 0.15));
+  // Get dynamic commission rate from model (admin configurable)
+  const commissionDoc = await Commission.findOne({ isActive: true }).sort({ createdAt: -1 });
+  const commissionRate = commissionDoc ? commissionDoc.percentage : Number(process.env.COMMISSION_RATE || 15);
+  const commission = financeService.calculateCommission(fare, commissionRate);
+  const driverEarnings = financeService.calculateNetIncome(fare, commissionRate);
 
   // Update booking
   booking.status = 'completed';
@@ -113,11 +127,61 @@ async function completeTrip(bookingId, endLocation, options = {}) {
         waitingTime: waitingTimeMinutes,
         vehicleType: booking.vehicleType,
         startedAt,
-        completedAt
+        completedAt,
+        commission,
+        netIncome: driverEarnings
       }
     },
     { upsert: true }
   );
+
+  // Persist earnings
+  try {
+    if (booking.driverId) {
+      await DriverEarnings.create({
+        driverId: String(booking.driverId),
+        bookingId: booking._id,
+        tripDate: new Date(),
+        grossFare: fare,
+        commissionAmount: commission,
+        netEarnings: driverEarnings,
+        commissionPercentage: commissionRate
+      });
+    }
+    await AdminEarnings.create({
+      bookingId: booking._id,
+      tripDate: new Date(),
+      grossFare: fare,
+      commissionEarned: commission,
+      commissionPercentage: commissionRate,
+      driverId: String(booking.driverId || ''),
+      passengerId: String(booking.passengerId || '')
+    });
+  } catch (_) {}
+
+  // Rewards: add ETB 10 per 10 km for both driver & passenger
+  try {
+    const rewardPer10Km = 10;
+    const rewardUnits = Math.floor((distanceKm || 0) / 10);
+    const reward = rewardUnits * rewardPer10Km;
+    if (reward > 0) {
+      if (booking.driverId) await walletService.credit(booking.driverId, reward, 'Reward points for distance');
+      if (booking.passengerId) await walletService.credit(booking.passengerId, reward, 'Reward points for distance');
+    }
+  } catch (_) {}
+
+  // Broadcast lifecycle updates for admin dashboard
+  try {
+    broadcast('trip_completed', {
+      bookingId: String(booking._id),
+      amount: fare,
+      distance: distanceKm,
+      waitingTime: waitingTimeMinutes,
+      completedAt,
+      driverEarnings,
+      commission
+    });
+  } catch (_) {}
 
   return booking;
 }
