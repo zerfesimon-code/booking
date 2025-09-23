@@ -64,6 +64,17 @@ module.exports = {
   calculatePackage,
   calculateCommission,
   calculateNetIncome,
-  canAcceptBooking
+  canAcceptBooking,
+  /**
+   * Compute net income from totals: total fare minus total commission accumulated.
+   * @param {number} totalFinalFare
+   * @param {number} totalCommission
+   * @returns {number}
+   */
+  calculateNetIncomeTotals: function(totalFinalFare, totalCommission) {
+    const totalFareNum = toNumber(totalFinalFare, 0);
+    const totalCommissionNum = toNumber(totalCommission, 0);
+    return totalFareNum - totalCommissionNum;
+  }
 };
 
