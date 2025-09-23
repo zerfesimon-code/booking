@@ -12,6 +12,8 @@ try {
   WalletModel = wallet.Wallet;
 }
 
+const financeService = require('./financeService');
+
 async function credit(userId, amount, description = '') {
   if (!WalletModel) return null;
   if (TransactionModel) {

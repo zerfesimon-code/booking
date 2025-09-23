@@ -6,6 +6,7 @@ const { Passenger, Driver } = require('../models/userModels');
 const { DriverEarnings, AdminEarnings, Commission } = require('../models/commission');
 const { Wallet, Transaction } = require('../models/common');
 const positionUpdateService = require('./../services/positionUpdate');
+const financeService = require('./financeService');
 
 async function estimateFare({ vehicleType = 'mini', pickup, dropoff }) {
   const distanceKm = geolib.getDistance(
@@ -238,6 +239,19 @@ async function updateBookingLifecycle({ requester, id, status }) {
       err.status = 400;
       throw err;
     }
+    // Finance rule: ensure driver has enough package balance to accept
+    try {
+      const wallet = await Wallet.findOne({ userId: String(requester.id), role: 'driver' });
+      const packageBalance = wallet ? Number(wallet.balance || 0) : 0;
+      const targetFare = booking.fareFinal || booking.fareEstimated || 0;
+      if (!financeService.canAcceptBooking(packageBalance, targetFare)) {
+        const err = new Error('Insufficient package balance to accept booking');
+        err.status = 403;
+        throw err;
+      }
+    } catch (e) {
+      if (e && e.status) throw e;
+    }
     booking.driverId = String(requester.id);
     await Driver.findByIdAndUpdate(requester.id, { available: false });
   }
@@ -261,8 +275,8 @@ async function updateBookingLifecycle({ requester, id, status }) {
       const commission = await Commission.findOne({ isActive: true }).sort({ createdAt: -1 });
       const commissionRate = commission ? commission.percentage : 15;
       const grossFare = booking.fareFinal || booking.fareEstimated;
-      const commissionAmount = (grossFare * commissionRate) / 100;
-      const netEarnings = grossFare - commissionAmount;
+      const commissionAmount = financeService.calculateCommission(grossFare, commissionRate);
+      const netEarnings = financeService.calculateNetIncome(grossFare, commissionRate);
       await DriverEarnings.create({
         driverId: booking.driverId,
         bookingId: booking._id,
@@ -340,6 +354,19 @@ async function assignDriver({ bookingId, driverId, dispatcherId, passengerId }) 
     err.status = 400;
     throw err;
   }
+  // Finance rule: check driver's package balance before assignment
+  try {
+    const wallet = await Wallet.findOne({ userId: String(driverId), role: 'driver' });
+    const packageBalance = wallet ? Number(wallet.balance || 0) : 0;
+    const targetFare = booking.fareFinal || booking.fareEstimated || 0;
+    if (!financeService.canAcceptBooking(packageBalance, targetFare)) {
+      const err = new Error('Driver cannot be assigned due to insufficient package balance');
+      err.status = 403;
+      throw err;
+    }
+  } catch (e) {
+    if (e && e.status) throw e;
+  }
   const assignment = await BookingAssignment.create({ bookingId, driverId: String(driverId), dispatcherId: String(dispatcherId), passengerId: String(passengerId || booking.passengerId) });
   booking.driverId = String(driverId);
   booking.status = 'accepted';
@@ -349,7 +376,7 @@ async function assignDriver({ bookingId, driverId, dispatcherId, passengerId }) 
   return { booking, assignment };
 }
 
-async function listNearbyBookings({ latitude, longitude, radiusKm = 5, vehicleType, limit = 20 }) {
+async function listNearbyBookings({ latitude, longitude, radiusKm = 5, vehicleType, limit = 20, driverId }) {
   const query = { status: 'requested', ...(vehicleType ? { vehicleType } : {}) };
   const rows = await Booking.find(query).sort({ createdAt: -1 }).lean();
   const withDistance = rows.map(b => {
@@ -360,7 +387,16 @@ async function listNearbyBookings({ latitude, longitude, radiusKm = 5, vehicleTy
     return { booking: b, distanceKm: dKm };
   }).filter(x => isFinite(x.distanceKm) && x.distanceKm <= radiusKm);
   withDistance.sort((a, b) => a.distanceKm - b.distanceKm);
-  const selected = withDistance.slice(0, Math.min(parseInt(limit, 10) || 20, 100));
+  // Finance rule: optionally filter out bookings the driver cannot afford (package balance)
+  let filtered = withDistance;
+  if (driverId) {
+    try {
+      const wallet = await Wallet.findOne({ userId: String(driverId), role: 'driver' });
+      const packageBalance = wallet ? Number(wallet.balance || 0) : 0;
+      filtered = withDistance.filter(x => financeService.canAcceptBooking(packageBalance, x.booking.fareFinal || x.booking.fareEstimated || 0));
+    } catch (_) {}
+  }
+  const selected = filtered.slice(0, Math.min(parseInt(limit, 10) || 20, 100));
   return selected.map(x => ({
     id: String(x.booking._id),
     passengerId: x.booking.passengerId,

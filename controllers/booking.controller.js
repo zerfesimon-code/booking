@@ -117,7 +117,7 @@ exports.nearby = async (req, res) => {
     if (!isFinite(latitude) || !isFinite(longitude)) {
       return res.status(400).json({ message: 'Valid latitude and longitude are required' });
     }
-    const result = await bookingService.listNearbyBookings({ latitude, longitude, radiusKm, vehicleType, limit });
+    const result = await bookingService.listNearbyBookings({ latitude, longitude, radiusKm, vehicleType, limit, driverId: req.user && req.user.type === 'driver' ? String(req.user.id) : undefined });
     return res.json(result);
   } catch (e) { errorHandler(res, e); }
 }

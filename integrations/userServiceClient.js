@@ -62,7 +62,7 @@ async function getDriverDetails(id, token) {
     const url = buildUrlFromTemplate(tpl, { id });
     const data = await httpGet(url, getAuthHeaders(token));
     const u = data?.data || data?.user || data?.driver || data;
-    return { success: true, user: { id: String(u.id || u._id || id), name: u.name, phone: u.phone, email: u.email, externalId: u.externalId, vehicleType: u.vehicleType, carPlate: u.carPlate, carModel: u.carModel, carColor: u.carColor, rating: u.rating, available: u.available, lastKnownLocation: u.lastKnownLocation } };
+    return { success: true, user: { id: String(u.id || u._id || id), name: u.name, phone: u.phone, email: u.email, externalId: u.externalId, vehicleType: u.vehicleType, carPlate: u.carPlate, carModel: u.carModel, carColor: u.carColor, rating: u.rating, available: u.available, lastKnownLocation: u.lastKnownLocation, paymentPreference: u.paymentPreference,} };
   } catch (e) {
     return { success: false, message: e.response?.data?.message || e.message };
   }
@@ -87,7 +87,8 @@ async function getDriverById(id, options) {
     carColor: res.user.carColor,
     rating: res.user.rating,
     available: res.user.available,
-    lastKnownLocation: res.user.lastKnownLocation
+    lastKnownLocation: res.user.lastKnownLocation,
+    paymentPreference: res.user.paymentPreference,
   };
 }
 
@@ -101,7 +102,8 @@ async function getPassengerById(id, options) {
     phone: res.user.phone, 
     email: res.user.email,
     externalId: res.user.externalId,
-    vehicleType: res.user.vehicleType
+    vehicleType: res.user.vehicleType,
+    paymentPreference: res.user.paymentPreference
   };
 }
 
@@ -111,7 +113,7 @@ async function getDriversByIds(ids = [], token) {
     const url = `${base}/drivers/batch`;
     const data = await httpPost(url, { ids }, getAuthHeaders(token));
     const arr = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
-    return arr.map(u => ({ id: String(u.id || u._id || ''), name: u.name, phone: u.phone, email: u.email, vehicleType: u.vehicleType, carPlate: u.carPlate, rating: u.rating, available: u.available }));
+    return arr.map(u => ({ id: String(u.id || u._id || ''), name: u.name, phone: u.phone, email: u.email, vehicleType: u.vehicleType, carPlate: u.carPlate, rating: u.rating, available: u.available, paymentPreference: u.paymentPreference }));
   } catch (e) {
     // Fallback per-id with internal fallback in getDriverById (will try service bearer)
     const results = await Promise.all((ids || []).map(id => getDriverById(id, {})));
@@ -127,7 +129,7 @@ async function listDrivers(query = {}, options) {
     const token = options && options.headers ? options.headers.Authorization : undefined;
     let data = await httpGet(url.toString(), getAuthHeaders(token));
     const arr = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
-    return arr.map(u => ({ id: String(u.id || u._id || ''), name: u.name, phone: u.phone, email: u.email, vehicleType: u.vehicleType, carPlate: u.carPlate, rating: u.rating, available: u.available }));
+    return arr.map(u => ({ id: String(u.id || u._id || ''), name: u.name, phone: u.phone, email: u.email, vehicleType: u.vehicleType, carPlate: u.carPlate, rating: u.rating, available: u.available, paymentPreference: u.paymentPreference }));
   } catch (_) {
     try {
       // Fallback with service bearer
@@ -136,7 +138,7 @@ async function listDrivers(query = {}, options) {
       Object.entries(query || {}).forEach(([k, v]) => { if (v != null) url.searchParams.set(k, v); });
       const data = await httpGet(url.toString(), getAuthHeaders(undefined));
       const arr = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
-      return arr.map(u => ({ id: String(u.id || u._id || ''), name: u.name, phone: u.phone, email: u.email, vehicleType: u.vehicleType, carPlate: u.carPlate, rating: u.rating, available: u.available }));
+      return arr.map(u => ({ id: String(u.id || u._id || ''), name: u.name, phone: u.phone, email: u.email, vehicleType: u.vehicleType, carPlate: u.carPlate, rating: u.rating, available: u.available, paymentPreference: u.paymentPreference }));
     } catch (__) { return []; }
   }
 }
