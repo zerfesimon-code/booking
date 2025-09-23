@@ -71,6 +71,26 @@ module.exports = (io, socket) => {
       socket.join(room);
       bookingEvents.emitBookingUpdate(String(updated._id), { status: 'accepted', driverId: String(socket.user.id), acceptedAt: updated.acceptedAt });
 
+      // Emit explicit booking_accept with enriched driver details to booking room
+      try {
+        const { Driver } = require('../models/userModels');
+        const d = await Driver.findById(String(socket.user.id)).lean();
+        const driverPayload = {
+          id: String(socket.user.id),
+          name: (d && d.name) || socket.user.name,
+          phone: (d && d.phone) || socket.user.phone,
+          carName: (d && (d.carModel || d.carName)) || socket.user.carName || socket.user.carModel,
+          vehicleType: (d && d.vehicleType) || socket.user.vehicleType,
+          rating: (d && (d.rating || d.rating === 0 ? d.rating : undefined)) ?? 5.0,
+          carPlate: d && d.carPlate || socket.user.carPlate
+        };
+        io.to(room).emit('booking_accept', {
+          bookingId: String(updated._id),
+          status: 'accepted',
+          driver: driverPayload
+        });
+      } catch (_) {}
+
       // Inform nearby drivers to remove
       try {
         const { Driver } = require('../models/userModels');

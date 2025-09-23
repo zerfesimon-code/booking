@@ -80,6 +80,49 @@ This document lists all Socket.IO events in the system, who emits them, required
   - Payload: `{ bookingId, location }`
 
 - Event: `trip_completed`
+
+- Event: `booking_accept`
+  - Target: Room `booking:{bookingId}`
+  - Payload:
+    {
+      bookingId: "<id>",
+      status: "accepted",
+      driver: {
+        id: "<ObjectId>",
+        name: "John Doe",
+        phone: "+251900000000",
+        carName: "Toyota Vitz",
+        vehicleType: "Sedan",
+        rating: 4.8,
+        carPlate: "AB-12345"
+      }
+    }
+
+---
+
+### Driver Domain (Server Emits)
+
+- Event: `driver:init_bookings`
+  - Target: Driver socket immediately after connection
+  - Payload:
+    {
+      driverId: "<ObjectId>",
+      bookings: [
+        {
+          bookingId: "<ObjectId>",
+          status: "pending",
+          pickup: "Bole Airport",
+          dropoff: "CMC",
+          fare: 350,
+          passenger: {
+            id: "<ObjectId>",
+            name: "Jane Doe",
+            phone: "+251911111111"
+          }
+        }
+      ]
+    }
+
   - Target: Room `booking:{bookingId}`
   - Payload: `{ bookingId, amount, distance, waitingTime, completedAt, driverEarnings, commission }`
 

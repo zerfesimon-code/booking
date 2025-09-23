@@ -2,6 +2,33 @@ const driverService = require('../services/driverService');
 const driverEvents = require('../events/driverEvents');
 
 module.exports = (io, socket) => {
+  // On connection, send initial driver bookings once
+  try {
+    if (socket.user && String(socket.user.type).toLowerCase() === 'driver') {
+      (async () => {
+        try {
+          const { Booking } = require('../models/bookingModels');
+          const rows = await Booking.find({ driverId: String(socket.user.id), status: { $in: ['accepted', 'ongoing', 'requested'] } })
+            .sort({ createdAt: -1 })
+            .limit(50)
+            .lean();
+          const payload = {
+            driverId: String(socket.user.id),
+            bookings: rows.map(b => ({
+              bookingId: String(b._id),
+              status: b.status,
+              pickup: b.pickup && (b.pickup.address || b.pickup),
+              dropoff: b.dropoff && (b.dropoff.address || b.dropoff),
+              fare: b.fareEstimated || b.fareFinal,
+              passenger: b.passengerId ? { id: String(b.passengerId), name: b.passengerName, phone: b.passengerPhone } : undefined
+            }))
+          };
+          socket.emit('driver:init_bookings', payload);
+        } catch (_) {}
+      })();
+    }
+  } catch (_) {}
+
   // driver:availability
   socket.on('driver:availability', async (payload) => {
     try {
