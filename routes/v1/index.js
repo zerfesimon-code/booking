@@ -16,16 +16,6 @@ router.use(
   })()
 );
 
-// Public payment options list (no auth)
-router.get('/payment-options', async (req, res) => {
-  try {
-    const rows = await require('../../services/paymentService').getPaymentOptions();
-    return res.json(rows);
-  } catch (e) {
-    return res.status(500).json({ message: e.message });
-  }
-});
-
 // Everything below requires auth
 router.use(authenticate);
 

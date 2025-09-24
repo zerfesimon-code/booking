@@ -2603,9 +2603,10 @@
 			"name": "🏦 Payment Options",
 			"item": [
 				{
-					"name": "List Payment Options (public)",
+					"name": "List Payment Options (auth)",
 					"request": {
 						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{driverToken}}" } ],
 						"url": { "raw": "{{baseUrl}}/v1/payment-options", "host": ["{{baseUrl}}"], "path": ["v1","payment-options"] }
 					},
 					"response": [

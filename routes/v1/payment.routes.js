@@ -8,11 +8,11 @@ const ctrl = require('../../controllers/paymentController');
 // Create
 router.post('/', authorize('admin'), ctrl.createPaymentOption);
 
-// List all (authenticated)
-router.get('/', ctrl.listPaymentOptions);
+// List all (drivers/admin/staff/superadmin)
+router.get('/', authorize('driver','admin','staff','superadmin'), ctrl.listPaymentOptions);
 
-// Get one (authenticated)
-router.get('/:id', ctrl.getPaymentOption);
+// Get one (drivers/admin/staff/superadmin)
+router.get('/:id', authorize('driver','admin','staff','superadmin'), ctrl.getPaymentOption);
 
 // Update
 router.put('/:id', authorize('admin'), ctrl.updatePaymentOption);
