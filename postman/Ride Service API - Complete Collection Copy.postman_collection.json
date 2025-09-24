@@ -1,7 +1,7 @@
 {
 	"info": {
 		"_postman_id": "5be35b59-c6ac-4de2-a960-691e41ad1dad",
-		"name": "Ride Service API - Complete Collection Copy",
+		"name": "Booking Service API collection",
 		"description": "Comprehensive API collection for ride service with organized folders, all endpoints, and axios integration",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "24624704",
