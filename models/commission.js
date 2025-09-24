@@ -5,7 +5,7 @@ const CommissionSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   effectiveFrom: { type: Date, default: Date.now },
   effectiveTo: { type: Date },
-  createdBy: { type: String, required: true }, // Admin ID who set this commission
+  createdBy: { type: String, required: true },
   description: { type: String }
 }, { timestamps: true, toJSON: { versionKey: false }, toObject: { versionKey: false } });
 

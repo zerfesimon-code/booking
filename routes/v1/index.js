@@ -30,16 +30,8 @@ router.use("/live", require("./live.routes"));
 router.use("/pricing", authorize("admin"), require("./pricing.routes"));
 router.use("/admins", authorize("admin"), require("./admin.routes"));
 router.use("/drivers", require("./driver.routes"));
-// Payment options simple router
-router.get('/payment-options', async (req, res) => {
-  try {
-    const ctrl = require('../../controllers/driver.controller');
-    const rows = await require('../../services/paymentService').getPaymentOptions();
-    return res.json(rows);
-  } catch (e) {
-    return res.status(500).json({ message: e.message });
-  }
-});
+// Payment options CRUD (authenticated routes)
+router.use('/payment-options', require('./payment.routes'));
 router.post('/driver/payment-preference', authorize('driver'), async (req, res) => {
   try {
     const ctrl = require('../../controllers/driver.controller');
