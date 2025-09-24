@@ -2599,38 +2599,116 @@
 									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6OSwidHlwZSI6InBhc3NlbmdlciIsInJvbGVzIjpbXSwicGVybWlzc2lvbnMiOltdLCJuYW1lIjoiSm9obiBTbWl0aCIsInBob25lIjoiKzEyMzQ1Njc4OTAiLCJlbWFpbCI6ImpvaG4uc21pdGhAZXhhbXBsZS5jb20iLCJ3YWxsZXQiOiIwLjAwIiwicmF0aW5nIjo1LCJyZXdhcmRQb2ludHMiOjAsImlhdCI6MTc1NzY2OTUxMiwiZXhwIjoxNzU4Mjc0MzEyfQ.yVpKRFToIHT4m7u0RrHYUtVI3yURuy6S-eWzAIKF-yU",
 									"type": "string"
         },
-        {
-            "name": "🏦 Payment Options",
-            "item": [
-                {
-                    "name": "List Payment Options (public)",
-                    "request": {
-                        "method": "GET",
-                        "url": { "raw": "{{baseUrl}}/v1/payment-options", "host": ["{{baseUrl}}"], "path": ["v1","payment-options"] }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "List Payment Options (driver namespace)",
-                    "request": {
-                        "method": "GET",
-                        "header": [ { "key": "Authorization", "value": "Bearer {{driverToken}}" } ],
-                        "url": { "raw": "{{baseUrl}}/v1/drivers/payment-options", "host": ["{{baseUrl}}"], "path": ["v1","drivers","payment-options"] }
-                    },
-                    "response": []
-                },
-                {
-                    "name": "Set Driver Payment Preference",
-                    "request": {
-                        "method": "POST",
-                        "header": [ { "key": "Authorization", "value": "Bearer {{driverToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
-                        "body": { "mode": "raw", "raw": "{\n  \"paymentOptionId\": \"{{paymentOptionId}}\"\n}" },
-                        "url": { "raw": "{{baseUrl}}/v1/driver/payment-preference", "host": ["{{baseUrl}}"], "path": ["v1","driver","payment-preference"] }
-                    },
-                    "response": []
-                }
-            ]
-        }
+		{
+			"name": "🏦 Payment Options",
+			"item": [
+				{
+					"name": "List Payment Options (public)",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{baseUrl}}/v1/payment-options", "host": ["{{baseUrl}}"], "path": ["v1","payment-options"] }
+					},
+					"response": [
+						{
+							"name": "Example 200",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "[\n  {\n    \"_id\": \"650f1e2a9a1b2c3d4e5f6789\",\n    \"name\": \"Telebirr\",\n    \"logo\": \"https://cdn.app/logos/telebirr.png\"\n  }\n]"
+						}
+					]
+				},
+				{
+					"name": "Create Payment Option (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+						"body": { "mode": "raw", "raw": "{\n  \"name\": \"New Payment Service\",\n  \"logo\": \"https://cdn.app/logos/new-service.png\"\n}" },
+						"url": { "raw": "{{baseUrl}}/v1/payment-options", "host": ["{{baseUrl}}"], "path": ["v1","payment-options"] }
+					},
+					"response": [
+						{
+							"name": "Example 201",
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"body": "{\n  \"_id\": \"6510a1b2c3d4e5f67890abcd\",\n  \"name\": \"New Payment Service\",\n  \"logo\": \"https://cdn.app/logos/new-service.png\",\n  \"createdAt\": \"2025-09-24T12:00:00.000Z\",\n  \"updatedAt\": \"2025-09-24T12:00:00.000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Payment Option",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" } ],
+						"url": { "raw": "{{baseUrl}}/v1/payment-options/{{paymentOptionId}}", "host": ["{{baseUrl}}"], "path": ["v1","payment-options","{{paymentOptionId}}"] }
+					},
+					"response": [
+						{
+							"name": "Example 200",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "{\n  \"_id\": \"6510a1b2c3d4e5f67890abcd\",\n  \"name\": \"New Payment Service\",\n  \"logo\": \"https://cdn.app/logos/new-service.png\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update Payment Option (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+						"body": { "mode": "raw", "raw": "{\n  \"name\": \"New Payment Service\",\n  \"logo\": \"https://cdn.app/logos/new-service.png\"\n}" },
+						"url": { "raw": "{{baseUrl}}/v1/payment-options/{{paymentOptionId}}", "host": ["{{baseUrl}}"], "path": ["v1","payment-options","{{paymentOptionId}}"] }
+					},
+					"response": [
+						{
+							"name": "Example 200",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "{\n  \"_id\": \"6510a1b2c3d4e5f67890abcd\",\n  \"name\": \"New Payment Service\",\n  \"logo\": \"https://cdn.app/logos/new-service.png\",\n  \"createdAt\": \"2025-09-24T12:00:00.000Z\",\n  \"updatedAt\": \"2025-09-24T12:05:00.000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Delete Payment Option (Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" } ],
+						"url": { "raw": "{{baseUrl}}/v1/payment-options/{{paymentOptionId}}", "host": ["{{baseUrl}}"], "path": ["v1","payment-options","{{paymentOptionId}}"] }
+					},
+					"response": [
+						{
+							"name": "Example 200",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"body": "{\n  \"success\": true\n}"
+						}
+					]
+				},
+				{
+					"name": "List Payment Options (driver namespace)",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{driverToken}}" } ],
+						"url": { "raw": "{{baseUrl}}/v1/drivers/payment-options", "host": ["{{baseUrl}}"], "path": ["v1","drivers","payment-options"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Set Driver Payment Preference",
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Authorization", "value": "Bearer {{driverToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+						"body": { "mode": "raw", "raw": "{\n  \"paymentOptionId\": \"{{paymentOptionId}}\"\n}" },
+						"url": { "raw": "{{baseUrl}}/v1/driver/payment-preference", "host": ["{{baseUrl}}"], "path": ["v1","driver","payment-preference"] }
+					},
+					"response": []
+				}
+			]
+		}
 							]
 						},
 						"method": "POST",
