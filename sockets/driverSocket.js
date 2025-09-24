@@ -23,7 +23,7 @@ module.exports = (io, socket) => {
               passenger: b.passengerId ? { id: String(b.passengerId), name: b.passengerName, phone: b.passengerPhone } : undefined
             }))
           };
-          socket.emit('driver:nearby', payload);
+          socket.emit('booking:nearby', payload);
         } catch (_) {}
       })();
     }
