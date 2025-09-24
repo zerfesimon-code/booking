@@ -91,6 +91,42 @@
                         "url": { "raw": "socketio://emit/booking:driver_location_update" }
                     },
                     "response": []
+                },
+                {
+                    "name": "booking_accept (Server emits payload)",
+                    "request": {
+                        "method": "GET",
+                        "header": [ { "key": "X-Postman-Note", "value": "Documentation of server-emitted payload" } ],
+                        "url": { "raw": "socketio://emit/booking_accept" }
+                    },
+                    "response": [
+                        {
+                            "name": "Example",
+                            "originalRequest": { "method": "GET", "url": "socketio://emit/booking_accept" },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "body": "{\n  \"bookingId\": \"64f2b8d8e1234567890abcd\",\n  \"status\": \"accepted\",\n  \"driver\": {\n    \"id\": \"64f2a93c8b12ef1234567890\",\n    \"name\": \"John Doe\",\n    \"phone\": \"251900000000\",\n    \"carName\": \"Toyota Vitz\",\n    \"vehicleType\": \"Sedan\",\n    \"rating\": 4.8,\n    \"carPlate\": \"AB-12345\"\n  }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "driver:init_bookings (Server emits payload)",
+                    "request": {
+                        "method": "GET",
+                        "header": [ { "key": "X-Postman-Note", "value": "Documentation of server-emitted payload" } ],
+                        "url": { "raw": "socketio://emit/driver:init_bookings" }
+                    },
+                    "response": [
+                        {
+                            "name": "Example",
+                            "originalRequest": { "method": "GET", "url": "socketio://emit/driver:init_bookings" },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "body": "{\n  \"driverId\": \"64f2a93c8b12ef1234567890\",\n  \"bookings\": [\n    {\n      \"bookingId\": \"64f2b8d8e1234567890abcd\",\n      \"status\": \"pending\",\n      \"pickup\": \"Bole Airport\",\n      \"dropoff\": \"CMC\",\n      \"fare\": 350,\n      \"passenger\": {\n        \"id\": \"64f2b8d8e1234567890abcd\",\n        \"name\": \"Jane Doe\",\n        \"phone\": \"251911111111\"\n      }\n    }\n  ]\n}"
+                        }
+                    ]
                 }
             ]
         },
@@ -325,7 +361,7 @@
 					"name": "🚗 Driver Discovery",
 					"item": [
 						{
-							"name": "Discover Drivers + Estimate Fare (Combined)",
+							"name": "Discover Drivers  Estimate Fare (Combined)",
 							"event": [
 								{
 									"listen": "test",
@@ -1219,7 +1255,7 @@
 										],
 										"body": {
 											"mode": "raw",
-											"raw": "{\n  \"name\": \"Alice Johnson\",\n  \"phone\": \"+1234567893\",\n  \"email\": \"alice.johnson@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"emergencyContacts\": [\n    {\n      \"name\": \"Bob Johnson\",\n      \"phone\": \"+1234567894\",\n      \"relationship\": \"Husband\"\n    }\n  ]\n}"
+											"raw": "{\n  \"name\": \"Alice Johnson\",\n  \"phone\": \"1234567893\",\n  \"email\": \"alice.johnson@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"emergencyContacts\": [\n    {\n      \"name\": \"Bob Johnson\",\n      \"phone\": \"1234567894\",\n      \"relationship\": \"Husband\"\n    }\n  ]\n}"
 										},
 										"url": {
 											"raw": "{{baseUrl}}/v1/passengers",
@@ -2549,7 +2585,7 @@
 			],
 			"description": "All admin and staff management endpoints with comprehensive dummy data"
 		},
-		{
+        {
 			"name": "💳 Wallet",
 			"item": [
 				{
@@ -2562,7 +2598,39 @@
 									"key": "token",
 									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6OSwidHlwZSI6InBhc3NlbmdlciIsInJvbGVzIjpbXSwicGVybWlzc2lvbnMiOltdLCJuYW1lIjoiSm9obiBTbWl0aCIsInBob25lIjoiKzEyMzQ1Njc4OTAiLCJlbWFpbCI6ImpvaG4uc21pdGhAZXhhbXBsZS5jb20iLCJ3YWxsZXQiOiIwLjAwIiwicmF0aW5nIjo1LCJyZXdhcmRQb2ludHMiOjAsImlhdCI6MTc1NzY2OTUxMiwiZXhwIjoxNzU4Mjc0MzEyfQ.yVpKRFToIHT4m7u0RrHYUtVI3yURuy6S-eWzAIKF-yU",
 									"type": "string"
-								}
+        },
+        {
+            "name": "🏦 Payment Options",
+            "item": [
+                {
+                    "name": "List Payment Options (public)",
+                    "request": {
+                        "method": "GET",
+                        "url": { "raw": "{{baseUrl}}/v1/payment-options", "host": ["{{baseUrl}}"], "path": ["v1","payment-options"] }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Payment Options (driver namespace)",
+                    "request": {
+                        "method": "GET",
+                        "header": [ { "key": "Authorization", "value": "Bearer {{driverToken}}" } ],
+                        "url": { "raw": "{{baseUrl}}/v1/drivers/payment-options", "host": ["{{baseUrl}}"], "path": ["v1","drivers","payment-options"] }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Set Driver Payment Preference",
+                    "request": {
+                        "method": "POST",
+                        "header": [ { "key": "Authorization", "value": "Bearer {{driverToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+                        "body": { "mode": "raw", "raw": "{\n  \"paymentOptionId\": \"{{paymentOptionId}}\"\n}" },
+                        "url": { "raw": "{{baseUrl}}/v1/driver/payment-preference", "host": ["{{baseUrl}}"], "path": ["v1","driver","payment-preference"] }
+                    },
+                    "response": []
+                }
+            ]
+        }
 							]
 						},
 						"method": "POST",
@@ -2578,7 +2646,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"id\": \"207055314\",\n  \"amount\": 1,\n  \"reason\": \"Payment for a coffee\",\n  \"merchantId\": \"c392ec88-2ac9-46c2-8fd4-36aa49b4f469\",\n  \"phoneNumber\": \"+251941893993\",\n  \"paymentMethod\": \"Telebirr\",\n\"notifyUrl\": https://bookings.capitalinvestmenttradingplc.com/v1/webhooks/public\n}\n\n    "
+							"raw": "{\n  \"id\": \"207055314\",\n  \"amount\": 1,\n  \"reason\": \"Payment for a coffee\",\n  \"merchantId\": \"c392ec88-2ac9-46c2-8fd4-36aa49b4f469\",\n  \"phoneNumber\": \"251941893993\",\n  \"paymentMethod\": \"Telebirr\",\n\"notifyUrl\": https://bookings.capitalinvestmenttradingplc.com/v1/webhooks/public\n}\n\n    "
 						},
 						"url": {
 							"raw": "{{baseUrl}}/v1/wallet/topup",
@@ -2635,7 +2703,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"amount\": 50,\n  \"destination\": \"+2519XXXXXXX\",\n  \"method\": \"santimpay\"\n}"
+							"raw": "{\n  \"amount\": 50,\n  \"destination\": \"2519XXXXXXX\",\n  \"method\": \"santimpay\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/v1/wallet/withdraw",
@@ -2663,7 +2731,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"ID\": \"{{transactionId}}\",\n  \"Status\": \"SUCCESS\",\n  \"TxnId\": \"TX123\",\n  \"RefId\": \"REF123\",\n  \"Commission\": 1.5,\n  \"TotalAmount\": 101.5,\n  \"Msisdn\": \"+2519XXXXXXX\"\n}"
+							"raw": "{\n  \"ID\": \"{{transactionId}}\",\n  \"Status\": \"SUCCESS\",\n  \"TxnId\": \"TX123\",\n  \"RefId\": \"REF123\",\n  \"Commission\": 1.5,\n  \"TotalAmount\": 101.5,\n  \"Msisdn\": \"2519XXXXXXX\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/v1/wallet/webhook",
@@ -2722,7 +2790,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"amount\": 50,\n  \"destination\": \"+2519XXXXXXX\",\n  \"method\": \"santimpay\"\n}"
+							"raw": "{\n  \"amount\": 50,\n  \"destination\": \"2519XXXXXXX\",\n  \"method\": \"santimpay\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/v1/drivers/{{driverId}}/wallet/withdraw",
