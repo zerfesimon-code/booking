@@ -355,6 +355,77 @@
 			"description": "Authentication endpoints for all user types"
 		},
 		{
+			"name": "🏦 Payment Options",
+			"item": [
+				{
+					"name": "List Payment Options (auth)",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{driverToken}}" } ],
+						"url": { "raw": "{{baseUrl}}/v1/payment-options", "host": ["{{baseUrl}}"], "path": ["v1","payment-options"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Create Payment Option (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+						"body": { "mode": "raw", "raw": "{\n  \"name\": \"New Payment Service\",\n  \"logo\": \"https://cdn.app/logos/new-service.png\"\n}" },
+						"url": { "raw": "{{baseUrl}}/v1/payment-options", "host": ["{{baseUrl}}"], "path": ["v1","payment-options"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Get Payment Option (auth)",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{driverToken}}" } ],
+						"url": { "raw": "{{baseUrl}}/v1/payment-options/{{paymentOptionId}}", "host": ["{{baseUrl}}"], "path": ["v1","payment-options","{{paymentOptionId}}"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Update Payment Option (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+						"body": { "mode": "raw", "raw": "{\n  \"name\": \"New Payment Service\",\n  \"logo\": \"https://cdn.app/logos/new-service.png\"\n}" },
+						"url": { "raw": "{{baseUrl}}/v1/payment-options/{{paymentOptionId}}", "host": ["{{baseUrl}}"], "path": ["v1","payment-options","{{paymentOptionId}}"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Payment Option (Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [ { "key": "Authorization", "value": "Bearer {{adminToken}}" } ],
+						"url": { "raw": "{{baseUrl}}/v1/payment-options/{{paymentOptionId}}", "host": ["{{baseUrl}}"], "path": ["v1","payment-options","{{paymentOptionId}}"] }
+					},
+					"response": []
+				},
+				{
+					"name": "List Payment Options (driver namespace)",
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{driverToken}}" } ],
+						"url": { "raw": "{{baseUrl}}/v1/drivers/payment-options", "host": ["{{baseUrl}}"], "path": ["v1","drivers","payment-options"] }
+					},
+					"response": []
+				},
+				{
+					"name": "Set Driver Payment Preference",
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Authorization", "value": "Bearer {{driverToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+						"body": { "mode": "raw", "raw": "{\n  \"paymentOptionId\": \"{{paymentOptionId}}\"\n}" },
+						"url": { "raw": "{{baseUrl}}/v1/driver/payment-preference", "host": ["{{baseUrl}}"], "path": ["v1","driver","payment-preference"] }
+					},
+					"response": []
+				}
+			]
+		},
+		{
 			"name": "👤 Passenger APIs",
 			"item": [
 				{
