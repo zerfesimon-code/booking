@@ -91,10 +91,20 @@ exports.topup = async (req, res) => {
       metadata: { ...tx.metadata, gatewayResponse: gw },
     });
 
+    // Include driver info when driver initiates payment
+    let driver = undefined;
+    if (role === 'driver') {
+      try {
+        const { Driver } = require("../models/userModels");
+        const d = await Driver.findById(userId).select('name phone').lean();
+        driver = { id: String(userId), name: d?.name || '', phone: d?.phone || '' };
+      } catch (_) {}
+    }
     return res.status(202).json({
       message: "Topup initiated",
       transactionId: txId.toString(),
       gatewayTxnId: gwTxnId,
+      driver
     });
   } catch (e) {
     return res.status(500).json({ message: e.message });
@@ -250,13 +260,24 @@ exports.webhook = async (req, res) => {
       }
     }
 
-    // Respond with concise, important fields only
+    // Respond with concise, important fields only + include updated balance and driver if available
+    let driver = undefined;
+    let wallet = undefined;
+    try {
+      if (tx && tx.role === 'driver') {
+        const { Driver } = require("../models/userModels");
+        const d = await Driver.findById(tx.userId).select('name phone').lean();
+        driver = { id: String(tx.userId), name: d?.name || '', phone: d?.phone || '' };
+      }
+      const { Wallet } = require("../models/common");
+      wallet = await Wallet.findOne({ userId: String(tx.userId), role: tx.role }).lean();
+    } catch (_) {}
     return res.status(200).json({
       ok: true,
       txnId: data.TxnId || data.txnId,
       refId: data.RefId || data.refId,
       thirdPartyId: data.thirdPartyId,
-      status: data.Status || data.status,
+      status: tx.status,
       statusReason: data.StatusReason || data.message,
       amount: data.amount || data.Amount || data.TotalAmount,
       currency: data.currency || data.Currency || "ETB",
@@ -266,6 +287,8 @@ exports.webhook = async (req, res) => {
       updateType: data.updateType || data.UpdateType,
       updatedAt: new Date(),
       updatedBy: data.updatedBy || data.UpdatedBy,
+      balance: wallet ? wallet.balance : undefined,
+      driver
     });
   } catch (e) {
     // Always ACK with ok=false to prevent retries storms; log error
