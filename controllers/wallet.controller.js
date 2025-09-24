@@ -66,8 +66,7 @@ exports.topup = async (req, res) => {
       if (m === "telebirr" || m === "tele") return "Telebirr";
       if (m === "cbe" || m === "cbe-birr" || m === "cbebirr") return "CBE";
       if (m === "hellocash" || m === "hello-cash") return "HelloCash";
-      if (m === "santimpay") return "SantimPay";
-      ///return payment preference    return "Telebirr";
+      return "Telebirr";
     };
 
     const methodForGateway = normalizePaymentMethod(paymentMethod);
@@ -268,7 +267,7 @@ exports.webhook = async (req, res) => {
         const d = await Driver.findById(tx.userId).select('name phone').lean();
         driver = { id: String(tx.userId), name: d?.name || '', phone: d?.phone || '' };
       }
-      const { Wallet } = require("../models/common");gt
+      const { Wallet } = require("../models/common");
       wallet = await Wallet.findOne({ userId: String(tx.userId), role: tx.role }).lean();
     } catch (_) {}
     return res.status(200).json({
