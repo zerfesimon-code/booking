@@ -105,7 +105,11 @@ This document lists all Socket.IO events in the system, who emits them, required
 ### Driver Domain (Server Emits)
 
 - Event: `booking:nearby`
-  - Target: Driver socket immediately after connection
+  - Target: Driver socket on initial connection and on any reconnect
+  - Notes:
+    - Clients should subscribe to `booking:nearby` as soon as the socket connects and also re-subscribe on `connect` events after reconnects.
+    - When sent immediately after a (re)connection, the payload includes `init: true` and contains a full snapshot of nearby unassigned bookings and any current bookings assigned to the driver.
+    - Realtime incremental updates still arrive via `booking:new` and `booking:removed`; clients should merge these with the latest `booking:nearby` snapshot.
   - Payload:
     {
       init: true,
