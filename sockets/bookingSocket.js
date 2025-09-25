@@ -79,7 +79,15 @@ module.exports = (io, socket) => {
             createdAt: booking.createdAt,
             updatedAt: booking.updatedAt
           };
-          const payloadForDriver = { booking: bookingDetails, user: { id: passengerId, type: 'passenger' } };
+          const patch = {
+            status: 'requested',
+            passengerId,
+            vehicleType: booking.vehicleType,
+            pickup: booking.pickup,
+            dropoff: booking.dropoff,
+            passenger: { id: passengerId, name: socket.user.name, phone: socket.user.phone }
+          };
+          const payloadForDriver = { booking: bookingDetails, patch, user: { id: passengerId, type: 'passenger' } };
           const channel = `driver:${String(chosenDriver._id)}`;
           sendMessageToSocketId(channel, { event: 'booking:new', data: payloadForDriver });
           try { logger.info('message sent to:  driver:' + String(chosenDriver._id), { bookingId: String(booking._id) }); } catch (_) {}

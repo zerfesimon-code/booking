@@ -34,7 +34,15 @@ module.exports = (io, socket) => {
             distanceKm: b.distanceKm,
             passenger: b.passengerId ? { id: String(b.passengerId), name: b.passengerName, phone: b.passengerPhone } : undefined,
             createdAt: b.createdAt,
-            updatedAt: b.updatedAt
+            updatedAt: b.updatedAt,
+            patch: {
+              status: b.status,
+              passengerId: String(b.passengerId || ''),
+              vehicleType: b.vehicleType,
+              pickup: b.pickup,
+              dropoff: b.dropoff,
+              passenger: b.passengerId ? { id: String(b.passengerId), name: b.passengerName, phone: b.passengerPhone } : undefined
+            }
           }));
 
           // Nearby unassigned requested bookings created before connection
@@ -71,7 +79,15 @@ module.exports = (io, socket) => {
                   distanceKm: Math.round(x.distanceKm * 100) / 100,
                   passenger: x.booking.passengerId ? { id: String(x.booking.passengerId), name: x.booking.passengerName, phone: x.booking.passengerPhone } : undefined,
                   createdAt: x.booking.createdAt,
-                  updatedAt: x.booking.updatedAt
+                  updatedAt: x.booking.updatedAt,
+                  patch: {
+                    status: 'requested',
+                    passengerId: String(x.booking.passengerId || ''),
+                    vehicleType: x.booking.vehicleType,
+                    pickup: x.booking.pickup,
+                    dropoff: x.booking.dropoff,
+                    passenger: x.booking.passengerId ? { id: String(x.booking.passengerId), name: x.booking.passengerName, phone: x.booking.passengerPhone } : undefined
+                  }
                 }));
             }
           } catch (_) {}
