@@ -8,6 +8,7 @@ const { Booking } = require('../models/bookingModels');
 module.exports = (io, socket) => {
   // booking_request (create booking)
   socket.on('booking_request', async (payload) => {
+    try { logger.info('[socket<-passenger] booking_request', { sid: socket.id, userId: socket.user && socket.user.id }); } catch (_) {}
     try {
       const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
       if (!socket.user || String(socket.user.type).toLowerCase() !== 'passenger') {
@@ -24,7 +25,9 @@ module.exports = (io, socket) => {
       });
       const bookingRoom = `booking:${String(booking._id)}`;
       socket.join(bookingRoom);
-      socket.emit('booking:created', { bookingId: String(booking._id) });
+      const createdPayload = { bookingId: String(booking._id) };
+      try { logger.info('[socket->passenger] booking:created', { sid: socket.id, userId: socket.user && socket.user.id, bookingId: createdPayload.bookingId }); } catch (_) {}
+      socket.emit('booking:created', createdPayload);
 
       // Broadcast to nearby drivers (reuse existing nearbyDrivers service if present)
       try {
@@ -49,6 +52,7 @@ module.exports = (io, socket) => {
           }
         };
         targets.forEach(d => sendMessageToSocketId(`driver:${String(d._id)}`, { event: 'booking:new', data: patch }));
+        try { logger.info('[socket->drivers] booking:new broadcast', { bookingId: String(booking._id), targets: targets.map(x => String(x._id)) }); } catch (_) {}
       } catch (_) {}
     } catch (err) {
       socket.emit('booking_error', { message: 'Failed to create booking' });
@@ -57,6 +61,7 @@ module.exports = (io, socket) => {
 
   // booking_accept
   socket.on('booking_accept', async (payload) => {
+    try { logger.info('[socket<-driver] booking_accept', { sid: socket.id, userId: socket.user && socket.user.id, payload }); } catch (_) {}
     try {
       const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
       const bookingId = String(data.bookingId || '');
@@ -70,6 +75,7 @@ module.exports = (io, socket) => {
       const room = `booking:${String(updated._id)}`;
       socket.join(room);
       bookingEvents.emitBookingUpdate(String(updated._id), { status: 'accepted', driverId: String(socket.user.id), acceptedAt: updated.acceptedAt });
+      try { logger.info('[socket->room] booking:update accepted', { bookingId: String(updated._id), driverId: String(socket.user.id) }); } catch (_) {}
 
       // Emit explicit booking_accept with enriched driver details to booking room
       try {
@@ -84,11 +90,13 @@ module.exports = (io, socket) => {
           rating: (d && (d.rating || d.rating === 0 ? d.rating : undefined)) ?? 5.0,
           carPlate: d && d.carPlate || socket.user.carPlate
         };
-        io.to(room).emit('booking_accept', {
+        const acceptPayload = {
           bookingId: String(updated._id),
           status: 'accepted',
           driver: driverPayload
-        });
+        };
+        try { logger.info('[socket->room] booking_accept', { room, bookingId: acceptPayload.bookingId, driverId: driverPayload.id }); } catch (_) {}
+        io.to(room).emit('booking_accept', acceptPayload);
       } catch (_) {}
 
       // Inform nearby drivers to remove
@@ -108,12 +116,14 @@ module.exports = (io, socket) => {
           ) / 1000) <= radiusKm
         ));
         nearby.forEach(d => sendMessageToSocketId(`driver:${String(d._id)}`, { event: 'booking:removed', data: { bookingId: String(updated._id) } }));
+        try { logger.info('[socket->drivers] booking:removed broadcast', { bookingId: String(updated._id), count: nearby.length }); } catch (_) {}
       } catch (_) {}
     } catch (err) {}
   });
 
   // booking_cancel
   socket.on('booking_cancel', async (payload) => {
+    try { logger.info('[socket<-user] booking_cancel', { sid: socket.id, userId: socket.user && socket.user.id, payload }); } catch (_) {}
     try {
       const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
       const bookingId = String(data.bookingId || '');
@@ -122,11 +132,13 @@ module.exports = (io, socket) => {
       if (!bookingId) return socket.emit('booking_error', { message: 'bookingId is required', bookingId });
       const updated = await bookingService.updateBookingLifecycle({ requester: socket.user, id: bookingId, status: 'canceled' });
       bookingEvents.emitBookingUpdate(String(updated._id), { status: 'canceled', canceledBy: String(socket.user.type).toLowerCase(), canceledReason: reason });
+      try { logger.info('[socket->room] booking:update canceled', { bookingId: String(updated._id), by: String(socket.user.type).toLowerCase() }); } catch (_) {}
     } catch (err) {}
   });
 
   // trip_started
   socket.on('trip_started', async (payload) => {
+    try { logger.info('[socket<-driver] trip_started', { sid: socket.id, userId: socket.user && socket.user.id, payload }); } catch (_) {}
     try {
       const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
       const bookingId = String(data.bookingId || '');
@@ -139,6 +151,7 @@ module.exports = (io, socket) => {
       if (!booking) return socket.emit('booking_error', { message: 'Booking not found or not assigned to you', source: 'trip_started' });
       const updated = await lifecycle.startTrip(bookingId, startLocation);
       bookingEvents.emitTripStarted(io, updated);
+      try { logger.info('[socket->room] trip_started', { bookingId: String(updated._id) }); } catch (_) {}
     } catch (err) {
       logger.error('[trip_started] error', err);
       socket.emit('booking_error', { message: 'Failed to start trip', source: 'trip_started' });
@@ -147,6 +160,7 @@ module.exports = (io, socket) => {
 
   // trip_ongoing
   socket.on('trip_ongoing', async (payload) => {
+    try { logger.info('[socket<-driver] trip_ongoing', { sid: socket.id, userId: socket.user && socket.user.id, payload }); } catch (_) {}
     try {
       const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
       const bookingId = String(data.bookingId || '');
@@ -161,6 +175,7 @@ module.exports = (io, socket) => {
       if (!booking) return socket.emit('booking_error', { message: 'Booking not found or not assigned to you', source: 'trip_ongoing' });
       const point = await lifecycle.updateTripLocation(bookingId, String(socket.user.id), location);
       bookingEvents.emitTripOngoing(io, bookingId, point);
+      try { logger.info('[socket->room] trip_ongoing', { bookingId, lat: point.lat, lon: point.lng }); } catch (_) {}
     } catch (err) {
       logger.error('[trip_ongoing] error', err);
       socket.emit('booking_error', { message: 'Failed to update trip location', source: 'trip_ongoing' });
@@ -169,6 +184,7 @@ module.exports = (io, socket) => {
 
   // trip_completed
   socket.on('trip_completed', async (payload) => {
+    try { logger.info('[socket<-driver] trip_completed', { sid: socket.id, userId: socket.user && socket.user.id, payload }); } catch (_) {}
     try {
       const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
       const bookingId = String(data.bookingId || '');
@@ -184,6 +200,7 @@ module.exports = (io, socket) => {
       if (!booking) return socket.emit('booking_error', { message: 'Booking not found or not assigned to you', source: 'trip_completed' });
       const updated = await lifecycle.completeTrip(bookingId, endLocation, { surgeMultiplier, discount, debitPassengerWallet });
       bookingEvents.emitTripCompleted(io, updated);
+      try { logger.info('[socket->room] trip_completed', { bookingId: String(updated._id) }); } catch (_) {}
     } catch (err) {
       logger.error('[trip_completed] error', err);
       socket.emit('booking_error', { message: 'Failed to complete trip', source: 'trip_completed' });
