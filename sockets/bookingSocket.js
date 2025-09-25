@@ -29,31 +29,61 @@ module.exports = (io, socket) => {
       try { logger.info('[socket->passenger] booking:created', { sid: socket.id, userId: socket.user && socket.user.id, bookingId: createdPayload.bookingId }); } catch (_) {}
       socket.emit('booking:created', createdPayload);
 
-      // Broadcast to nearby drivers (reuse existing nearbyDrivers service if present)
+      // Select the nearest driver who can accept (has sufficient package balance)
       try {
-        const { driverByLocationAndVehicleType } = require('../services/nearbyDrivers');
-        const nearest = await driverByLocationAndVehicleType({
-          latitude: booking.pickup.latitude,
-          longitude: booking.pickup.longitude,
-          vehicleType: booking.vehicleType,
-          radiusKm: parseFloat(process.env.BROADCAST_RADIUS_KM || '5'),
-          limit: 5
-        });
-        const targets = (nearest || []).map(x => x.driver);
-        const patch = {
-          bookingId: String(booking._id),
-          patch: {
-            status: 'requested',
-            passengerId,
-            vehicleType: booking.vehicleType,
-            pickup: booking.pickup,
-            dropoff: booking.dropoff,
-            passenger: { id: passengerId, name: socket.user.name, phone: socket.user.phone }
-          }
-        };
-        targets.forEach(d => sendMessageToSocketId(`driver:${String(d._id)}`, { event: 'booking:new', data: patch }));
-        try { logger.info('[socket->drivers] booking:new broadcast', { bookingId: String(booking._id), targets: targets.map(x => String(x._id)) }); } catch (_) {}
-      } catch (_) {}
+        const { Driver } = require('../models/userModels');
+        const geolib = require('geolib');
+        const { Wallet } = require('../models/common');
+        const financeService = require('../services/financeService');
+
+        const radiusKm = parseFloat(process.env.BROADCAST_RADIUS_KM || process.env.RADIUS_KM || '5');
+        const drivers = await Driver.find({ available: true, ...(booking.vehicleType ? { vehicleType: booking.vehicleType } : {}) }).lean();
+
+        const withDistance = drivers.map(d => ({
+          driver: d,
+          distanceKm: d.lastKnownLocation && d.lastKnownLocation.latitude != null && d.lastKnownLocation.longitude != null
+            ? (geolib.getDistance(
+                { latitude: d.lastKnownLocation.latitude, longitude: d.lastKnownLocation.longitude },
+                { latitude: booking.pickup.latitude, longitude: booking.pickup.longitude }
+              ) / 1000)
+            : Number.POSITIVE_INFINITY
+        }))
+        .filter(x => Number.isFinite(x.distanceKm) && x.distanceKm <= radiusKm)
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+
+        const targetFare = booking.fareFinal || booking.fareEstimated || 0;
+        let chosenDriver = null;
+        for (const item of withDistance) {
+          try {
+            const w = await Wallet.findOne({ userId: String(item.driver._id), role: 'driver' }).lean();
+            const balance = w ? Number(w.balance || 0) : 0;
+            if (financeService.canAcceptBooking(balance, targetFare)) {
+              chosenDriver = item.driver;
+              break;
+            }
+          } catch (_) {}
+        }
+
+        if (chosenDriver) {
+          const patch = {
+            bookingId: String(booking._id),
+            patch: {
+              status: 'requested',
+              passengerId,
+              vehicleType: booking.vehicleType,
+              pickup: booking.pickup,
+              dropoff: booking.dropoff,
+              passenger: { id: passengerId, name: socket.user.name, phone: socket.user.phone }
+            },
+            user: { id: passengerId, type: 'passenger' }
+          };
+          const channel = `driver:${String(chosenDriver._id)}`;
+          sendMessageToSocketId(channel, { event: 'booking:new', data: patch });
+          try { logger.info('message sent to: ', channel.replace('driver:', 'driver:'), { bookingId: String(booking._id) }); } catch (_) {}
+        } else {
+          try { logger.info('[socket->drivers] no eligible driver (package/distance)', { bookingId: String(booking._id) }); } catch (_) {}
+        }
+      } catch (err) { try { logger.error('[booking_request] broadcast error', err); } catch (_) {} }
     } catch (err) {
       socket.emit('booking_error', { message: 'Failed to create booking' });
     }
@@ -93,7 +123,8 @@ module.exports = (io, socket) => {
         const acceptPayload = {
           bookingId: String(updated._id),
           status: 'accepted',
-          driver: driverPayload
+          driver: driverPayload,
+          user: { id: String(socket.user.id), type: 'driver' }
         };
         try { logger.info('[socket->room] booking_accept', { room, bookingId: acceptPayload.bookingId, driverId: driverPayload.id }); } catch (_) {}
         io.to(room).emit('booking_accept', acceptPayload);

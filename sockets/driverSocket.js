@@ -23,7 +23,8 @@ module.exports = (io, socket) => {
               dropoff: b.dropoff && (b.dropoff.address || b.dropoff),
               fare: b.fareEstimated || b.fareFinal,
               passenger: b.passengerId ? { id: String(b.passengerId), name: b.passengerName, phone: b.passengerPhone } : undefined
-            }))
+            })),
+            user: { id: socket.user && String(socket.user.id), type: 'driver' }
           };
           try { logger.info('[socket->driver] emit booking:nearby init', { sid: socket.id, userId: socket.user && socket.user.id, count: payload.bookings.length }); } catch (_) {}
           socket.emit('booking:nearby', payload);
