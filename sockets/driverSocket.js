@@ -46,51 +46,43 @@ module.exports = (io, socket) => {
           }));
 
           // Nearby unassigned requested bookings created before connection
-          let nearby = [];
-          try {
-            if (me && me.lastKnownLocation && Number.isFinite(me.lastKnownLocation.latitude) && Number.isFinite(me.lastKnownLocation.longitude)) {
-              const open = await Booking.find({ status: 'requested', $or: [{ driverId: { $exists: false } }, { driverId: null }, { driverId: '' }] })
-                .sort({ createdAt: -1 })
-                .limit(200)
-                .lean();
-              const withDistance = open.map(b => ({
-                booking: b,
-                distanceKm: geolib.getDistance(
-                  { latitude: me.lastKnownLocation.latitude, longitude: me.lastKnownLocation.longitude },
-                  { latitude: b.pickup?.latitude, longitude: b.pickup?.longitude }
-                ) / 1000
-              }))
-                .filter(x => Number.isFinite(x.distanceKm) && x.distanceKm <= radiusKm)
-                .sort((a, b) => a.distanceKm - b.distanceKm);
+let nearby = [];
+try {
+  if (me && me.lastKnownLocation && Number.isFinite(me.lastKnownLocation.latitude) && Number.isFinite(me.lastKnownLocation.longitude)) {
+    const open = await Booking.find({ status: 'requested', $or: [{ driverId: { $exists: false } }, { driverId: null }, { driverId: '' }] })
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+    const withDistance = open.map(b => ({
+      booking: b,
+      distanceKm: geolib.getDistance(
+        { latitude: me.lastKnownLocation.latitude, longitude: me.lastKnownLocation.longitude },
+        { latitude: b.pickup?.latitude, longitude: b.pickup?.longitude }
+      ) / 1000
+    }))
+      .filter(x => Number.isFinite(x.distanceKm) && x.distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
 
-              // Filter by package affordability
-              const w = await Wallet.findOne({ userId: driverId, role: 'driver' }).lean();
-              const balance = w ? Number(w.balance || 0) : 0;
-              nearby = withDistance
-                .filter(x => financeService.canAcceptBooking(balance, x.booking.fareFinal || x.booking.fareEstimated || 0))
-                .slice(0, 50)
-                .map(x => ({
-                  id: String(x.booking._id),
-                  status: x.booking.status,
-                  pickup: x.booking.pickup,
-                  dropoff: x.booking.dropoff,
-                  fareEstimated: x.booking.fareEstimated,
-                  fareFinal: x.booking.fareFinal,
-                  distanceKm: Math.round(x.distanceKm * 100) / 100,
-                  passenger: x.booking.passengerId ? { id: String(x.booking.passengerId), name: x.booking.passengerName, phone: x.booking.passengerPhone } : undefined,
-                  createdAt: x.booking.createdAt,
-                  updatedAt: x.booking.updatedAt,
-                  patch: {
-                    status: 'requested',
-                    passengerId: String(x.booking.passengerId || ''),
-                    vehicleType: x.booking.vehicleType,
-                    pickup: x.booking.pickup,
-                    dropoff: x.booking.dropoff,
-                    passenger: x.booking.passengerId ? { id: String(x.booking.passengerId), name: x.booking.passengerName, phone: x.booking.passengerPhone } : undefined
-                  }
-                }));
-            }
-          } catch (_) {}
+    // Filter by package affordability
+    const w = await Wallet.findOne({ userId: driverId, role: 'driver' }).lean();
+    const balance = w ? Number(w.balance || 0) : 0;
+    nearby = withDistance
+      .filter(x => financeService.canAcceptBooking(balance, x.booking.fareFinal || x.booking.fareEstimated || 0))
+      .slice(0, 50)
+      .map(x => ({
+        id: String(x.booking._id),
+        status: x.booking.status,
+        pickup: x.booking.pickup,
+        dropoff: x.booking.dropoff,
+        fareEstimated: x.booking.fareEstimated,
+        fareFinal: x.booking.fareFinal,
+        distanceKm: Math.round(x.distanceKm * 100) / 100,
+        passenger: x.booking.passengerId ? { id: String(x.booking.passengerId), name: x.booking.passengerName, phone: x.booking.passengerPhone } : undefined,
+        createdAt: x.booking.createdAt,
+        updatedAt: x.booking.updatedAt
+      }));
+  }
+} catch (_) {}
 
           const payload = {
             init: true,
@@ -99,7 +91,7 @@ module.exports = (io, socket) => {
             currentBookings,
             user: { id: driverId, type: 'driver' }
           };
-          try { logger.info('[socket->driver] emit booking:nearby init', { sid: socket.id, userId: driverId, nearbyCount: payload.bookings.length, currentCount: payload.currentBookings.length }); } catch (_) {}
+          try { logger.info('[socket->driver] emit booking:nearby ', { sid: socket.id, userId: driverId, nearbyCount: payload.bookings.length, currentCount: payload.currentBookings.length }); } catch (_) {}
           socket.emit('booking:nearby', payload);
         } catch (_) {}
       })();

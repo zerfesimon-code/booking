@@ -179,7 +179,7 @@ This document lists all Socket.IO events in the system, who emits them, required
 
 - Event: `pricing:update`
   - Emitter: Server (HTTP pricing controller)
-  - Payload: Updated pricing model document
+  - Payload: Updated pricing model document payload(bookingId)
 
 ---
 
