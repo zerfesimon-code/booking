@@ -14,7 +14,7 @@ const TransactionSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   type: { type: String, enum: ['credit','debit'], required: true },
   method: { type: String, enum: ['cash','wallet','telebirr','cbe','card','santimpay'], required: true },
-  status: { type: String, enum: ['pending','success','failed'], default: 'pending', index: true },
+  status: { type: String, enum: ['PENDING','COMPLETED','FAILED'], default: 'PENDING', index: true },
   metadata: { type: Object },
   commission: { type: Number },
   totalAmount: { type: Number },

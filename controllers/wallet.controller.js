@@ -1,50 +1,57 @@
 const { Wallet, Transaction } = require("../models/common");
 const santim = require("../integrations/santimpay");
 const mongoose = require("mongoose");
+const { Driver } = require("../models/userModels");
+const { Commission } = require("../models/commission");
+const financeService = require("../services/financeService");
+const logger = require("../utils/logger"); // <-- logger util
 
+/* ---------------------- TOPUP ---------------------- */
 exports.topup = async (req, res) => {
   try {
     const { amount, paymentMethod, reason = "Wallet Topup" } = req.body || {};
-    if (!amount || amount <= 0)
+    if (!amount || amount <= 0) {
+      logger.warn("[topup] Invalid amount:", amount);
       return res.status(400).json({ message: "amount must be > 0" });
+    }
 
-    // Phone must come from token
     const tokenPhone =
       req.user && (req.user.phone || req.user.phoneNumber || req.user.mobile);
-    if (!tokenPhone)
+    if (!tokenPhone) {
+      logger.warn("[topup] Missing phoneNumber in token for user:", req.user?.id);
       return res.status(400).json({ message: "phoneNumber missing in token" });
+    }
 
     // Normalize Ethiopian MSISDN
     const normalizeMsisdnEt = (raw) => {
       if (!raw) return null;
       let s = String(raw).trim();
       s = s.replace(/\s+/g, "").replace(/[-()]/g, "");
-      if (/^\+?251/.test(s)) {
-        s = s.replace(/^\+?251/, "+251");
-      } else if (/^0\d+/.test(s)) {
-        s = s.replace(/^0/, "+251");
-      } else if (/^9\d{8}$/.test(s)) {
-        s = "+251" + s;
-      }
+      if (/^\+?251/.test(s)) s = s.replace(/^\+?251/, "+251");
+      else if (/^0\d+/.test(s)) s = s.replace(/^0/, "+251");
+      else if (/^9\d{8}$/.test(s)) s = "+251" + s;
       if (!/^\+2519\d{8}$/.test(s)) return null;
       return s;
     };
 
     const msisdn = normalizeMsisdnEt(tokenPhone);
-    if (!msisdn)
+    if (!msisdn) {
+      logger.warn("[topup] Invalid phone format in token:", tokenPhone);
       return res.status(400).json({
         message: "Invalid phone format in token. Required: +2519XXXXXXXX",
       });
+    }
 
     const userId = String(req.user.id);
     const role = req.user.type;
 
     let wallet = await Wallet.findOne({ userId, role });
-    if (!wallet) wallet = await Wallet.create({ userId, role, balance: 0 });
+    if (!wallet) {
+      wallet = await Wallet.create({ userId, role, balance: 0 });
+      logger.info("[topup] Wallet created:", wallet);
+    }
 
-    // Generate ObjectId manually so we can use it for txnId/refId
     const txId = new mongoose.Types.ObjectId();
-
     const tx = await Transaction.create({
       _id: txId,
       refId: txId.toString(),
@@ -53,27 +60,25 @@ exports.topup = async (req, res) => {
       amount,
       type: "credit",
       method: "santimpay",
-      status: "pending",
-      msisdn: msisdn,
+      status: "PENDING",
+      msisdn,
       metadata: { reason },
     });
+    logger.info("[topup] Transaction created:", txId.toString());
 
-    // Normalize payment method for SantimPay API
     const normalizePaymentMethod = (method) => {
-      const m = String(method || "")
-        .trim()
-        .toLowerCase();
+      const m = String(method || "").trim().toLowerCase();
       if (m === "telebirr" || m === "tele") return "Telebirr";
       if (m === "cbe" || m === "cbe-birr" || m === "cbebirr") return "CBE";
       if (m === "hellocash" || m === "hello-cash") return "HelloCash";
       return "Telebirr";
     };
-
     const methodForGateway = normalizePaymentMethod(paymentMethod);
 
     const notifyUrl =
       process.env.SANTIMPAY_NOTIFY_URL ||
       `${process.env.PUBLIC_BASE_URL || ""}/v1/wallet/webhook`;
+
     const gw = await santim.directPayment({
       id: txId.toString(),
       amount,
@@ -83,72 +88,68 @@ exports.topup = async (req, res) => {
       paymentMethod: methodForGateway,
     });
 
-    // Persist gateway response keys if present
     const gwTxnId =
       gw?.TxnId || gw?.txnId || gw?.data?.TxnId || gw?.data?.txnId;
     await Transaction.findByIdAndUpdate(txId, {
       txnId: gwTxnId || undefined,
       metadata: { ...tx.metadata, gatewayResponse: gw },
     });
+    logger.info("[topup] Gateway response stored:", { txId, gwTxnId });
 
-    // Include driver info when driver initiates payment
     let driver = undefined;
-    if (role === 'driver') {
+    if (role === "driver") {
       try {
-        const { Driver } = require("../models/userModels");
-        const d = await Driver.findById(userId).select('name phone').lean();
-        driver = { id: String(userId), name: d?.name || '', phone: d?.phone || '' };
-      } catch (_) {}
+        const d = await Driver.findById(userId).select("name phone").lean();
+        driver = { id: String(userId), name: d?.name || "", phone: d?.phone || "" };
+      } catch (err) {
+        logger.warn("[topup] Driver lookup failed:", err.message);
+      }
     }
+
     return res.status(202).json({
       message: "Topup initiated",
       transactionId: txId.toString(),
       gatewayTxnId: gwTxnId,
-      driver
+      driver,
     });
   } catch (e) {
+    logger.error("[topup] Error:", e);
     return res.status(500).json({ message: e.message });
   }
 };
 
+/* ---------------------- WEBHOOK ---------------------- */
 exports.webhook = async (req, res) => {
   try {
-    // Expect SantimPay to call with fields including txnId, Status, amount, reason, msisdn, refId, thirdPartyId
     const body = req.body || {};
     const data = body.data || body;
-    // Debug log (can be toggled off via env)
+
     if (process.env.WALLET_WEBHOOK_DEBUG === "1") {
-      // eslint-disable-next-line no-console
-      console.log("[wallet-webhook] received:", data);
+      logger.info("[webhook] received:", data);
     }
-    // Prefer the id we originally sent (provider echoes it as thirdPartyId). Do not use provider RefId as our id.
-    const thirdPartyId =
-      data.thirdPartyId ||
-      data.ID ||
-      data.id ||
-      data.transactionId ||
-      data.clientReference;
-    const providerRefId = data.RefId || data.refId;
-    const gwTxnId = data.TxnId || data.txnId;
-    if (!thirdPartyId && !gwTxnId)
+
+    const thirdPartyId = data.thirdPartyId;
+    const providerRefId = data.refId;
+    const gwTxnId = data.txnId;
+
+    if (!thirdPartyId && !gwTxnId) {
+      logger.warn("[webhook] Invalid payload, missing ids:", data);
       return res.status(400).json({ message: "Invalid webhook payload" });
+    }
 
     let tx = null;
-    // If thirdPartyId looks like an ObjectId, try findById
     if (thirdPartyId && mongoose.Types.ObjectId.isValid(String(thirdPartyId))) {
-      tx = await Transaction.findById(thirdPartyId);//gwTxnId
+      tx = await Transaction.findById(thirdPartyId);
     }
-    // Otherwise try our refId match (we set refId to our ObjectId string when creating the tx)
     if (!tx && thirdPartyId) {
       tx = await Transaction.findOne({ refId: String(thirdPartyId) });
     }
-    // Fallback to gateway txnId
     if (!tx && gwTxnId) {
       tx = await Transaction.findOne({ txnId: String(gwTxnId) });
     }
+
     if (process.env.WALLET_WEBHOOK_DEBUG === "1") {
-      // eslint-disable-next-line no-console
-      console.log("[wallet-webhook] match:", {
+      logger.info("[webhook] match:", {
         thirdPartyId,
         gwTxnId,
         providerRefId,
@@ -157,8 +158,9 @@ exports.webhook = async (req, res) => {
         statusBefore: tx ? tx.status : null,
       });
     }
+
     if (!tx) {
-      // Always ACK to avoid provider retries, but indicate not found
+      logger.warn("[webhook] No transaction found:", { thirdPartyId, gwTxnId });
       return res.status(200).json({
         ok: false,
         message: "Transaction not found for webhook",
@@ -168,148 +170,125 @@ exports.webhook = async (req, res) => {
       });
     }
 
-    const rawStatus = (data.Status || data.status || "")
-      .toString()
-      .toUpperCase();
-    const normalizedStatus = ["COMPLETED", "SUCCESS", "APPROVED"].includes(
-      rawStatus
-    )
-      ? "COMPLETED"
-      : ["FAILED", "CANCELLED", "DECLINED"].includes(rawStatus)
-      ? "FAILED"
-      : "PENDING";
-
+    const hookStatus = (data.Status ?? "PENDING").toString().toUpperCase();
     const previousStatus = tx.status;
-    tx.txnId = gwTxnId || tx.txnId;
-    // Keep our refId as initially set (our ObjectId), do not overwrite with provider's RefId
-    tx.refId = tx.refId || (thirdPartyId && String(thirdPartyId));
-    tx.status = normalizedStatus;
-    // Numeric fields from provider
-    const n = (v) => (v == null ? undefined : Number(v));
-    tx.commission = n(data.commission) ?? n(data.Commission) ?? tx.commission;
-    tx.totalAmount =
-      n(data.totalAmount) ?? n(data.TotalAmount) ?? tx.totalAmount;
-    tx.msisdn = data.Msisdn || data.msisdn || tx.msisdn;
-    tx.metadata = {
+
+    const wasFinal =
+      previousStatus === "COMPLETED" || previousStatus === "FAILED";
+
+    tx.status = hookStatus;
+    tx.totalAmount = Number(data.totalAmount) || undefined;   
+     tx.metadata = {
       ...tx.metadata,
       webhook: data,
       raw: body,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
-      merId: data.merId,
-      merName: data.merName,
-      paymentVia: data.paymentVia || data.PaymentMethod,
+      paymentVia: data.PaymentMethod,
       commissionAmountInPercent: data.commissionAmountInPercent,
       providerCommissionAmountInPercent: data.providerCommissionAmountInPercent,
       vatAmountInPercent: data.vatAmountInPercent || data.VatAmountInPercent,
-      lotteryTax: data.lotteryTax,
       reason: data.reason,
     };
     tx.updatedAt = new Date();
 
-    // Idempotency: if already final state, do not re-apply wallet mutation
-    const wasFinal =
-      previousStatus === "COMPLETED" || previousStatus === "FAILED";
+    
+
     await tx.save();
+
     if (process.env.WALLET_WEBHOOK_DEBUG === "1") {
-      // eslint-disable-next-line no-console
-      console.log("[wallet-webhook] updated tx:", {
+      logger.info("[webhook] updated tx:", {
         txId: String(tx._id),
         statusAfter: tx.status,
       });
     }
 
-    if (!wasFinal && normalizedStatus === "COMPLETED") {
-      // For credits, prefer adjustedAmount (intended topup) then amount; for debits, prefer amount then adjustedAmount
-      const providerAmount =  n(data.amount) ?? tx.amount;
+    let driver = undefined;
+    let wallet = undefined;
+
+    if (!wasFinal && hookStatus === "COMPLETED") {
+      const providerAmount = Number(data.amount) ?? tx.amount;
+
       if (tx.type === "credit") {
-        // If this is a provider deposit for drivers, convert to package using dynamic commissionRate
-        //remaining package amount in wallet + providerAmount
-        let delta = tx.amount;
         try {
-          const { Commission } = require("../models/commission");
-          const financeService = require("../services/financeService");
-          //driverID:tx.userId
-          const commissionDoc = await Commission.findOne({driverID:tx.userId, isActive: true }).sort({ createdAt: -1 });
-          const commissionRate = commissionDoc ? commissionDoc.percentage : Number(process.env.COMMISSION_RATE || 15);
-          delta = delta + financeService.calculatePackage(providerAmount, commissionRate);  
-        } catch (_) {}
-        //findone and update
-        await Wallet.findOneAndUpdate(
-          { userId: tx.userId, role: tx.role },
-          { $inc: { balance: delta } },
-          { upsert: true }
-        );
+          if (tx.role === "driver") {
+            const d = await Driver.findById(tx.userId).select("name phone").lean();
+            driver = { id: String(tx.userId), name: d?.name || "", phone: d?.phone || "" };
+          }
+        } catch (err) {
+          logger.warn("[webhook] Driver lookup failed:", err.message);
+        }
+
+        try {
+          const commissionDoc = await Commission.findOne({
+            //make it only with driverID
+            driverID: tx.userId,
+            isActive: true,
+          }).sort({ createdAt: -1 });
+          const commissionRate =
+            commissionDoc?.percentage || Number(process.env.COMMISSION_RATE || 15);
+
+          const delta = financeService.calculatePackage(providerAmount, commissionRate);
+
+          wallet = await Wallet.findOneAndUpdate(
+            { userId: tx.userId, role: tx.role },
+            { $inc: { balance: delta } },
+            { upsert: true }
+          );
+          logger.info("[webhook] Wallet credited:", {
+            userId: tx.userId,
+            delta,
+            newBalance: wallet.balance,
+          });
+        } catch (err) {
+          logger.error("[webhook] Commission/package calc failed:", err);
+        }
       } else if (tx.type === "debit") {
         await Wallet.updateOne(
           { userId: tx.userId, role: tx.role },
           { $inc: { balance: -providerAmount } },
           { upsert: true }
         );
-      }
-      if (process.env.WALLET_WEBHOOK_DEBUG === "1") {
-        // eslint-disable-next-line no-console
-        console.log("[wallet-webhook] wallet mutated:", {
-          userId: tx.userId,
-          role: tx.role,
-          type: tx.type,
-          delta: tx.type === "credit" ? providerAmount : -providerAmount,
-        });
+        logger.info("[webhook] Wallet debited:", { userId: tx.userId, providerAmount });
       }
     }
 
-    // Respond with concise, important fields only + include updated balance and driver if available
-    let driver = undefined;
-    let wallet = undefined;
-    try {
-      if (tx && tx.role === 'driver') {
-        const { Driver } = require("../models/userModels");
-        const d = await Driver.findById(tx.userId).select('name phone').lean();
-        driver = { id: String(tx.userId), name: d?.name || '', phone: d?.phone || '' };
-      }
-      const { Wallet } = require("../models/common");
-      wallet = await Wallet.findOne({ userId: String(tx.userId), role: tx.role }).lean();
-    } catch (_) {}
     return res.status(200).json({
       ok: true,
       txnId: data.TxnId || data.txnId,
       refId: data.RefId || data.refId,
       thirdPartyId: data.thirdPartyId,
       status: tx.status,
-      statusReason: data.StatusReason || data.message,
-      amount: data.amount || data.Amount || data.TotalAmount,
+      amount: data.amount || tx.amount,
       currency: data.currency || data.Currency || "ETB",
-      msisdn: data.Msisdn || data.msisdn,
-      paymentVia: data.paymentVia || data.PaymentMethod,
-      message: data.message,
-      updateType: data.updateType || data.UpdateType,
+      msisdn: data.msisdn || tx.msisdn,
+      paymentVia: data.PaymentMethod,
+      message: data.message || "",
       updatedAt: new Date(),
-      updatedBy: data.updatedBy || data.UpdatedBy,
       balance: wallet ? wallet.balance : undefined,
-      driver
+      driver,
     });
   } catch (e) {
-    // Always ACK with ok=false to prevent retries storms; log error
-    if (process.env.WALLET_WEBHOOK_DEBUG === "1") {
-      // eslint-disable-next-line no-console
-      console.error("[wallet-webhook] error:", e);
-    }
+    logger.error("[webhook] Error:", e);
     return res.status(200).json({ ok: false, error: e.message });
   }
 };
 
+/* ---------------------- TRANSACTIONS ---------------------- */
 exports.transactions = async (req, res) => {
   try {
     const userId = req.params.userId || req.user.id;
     const rows = await Transaction.find({ userId: String(userId) })
       .sort({ createdAt: -1 })
       .lean();
+
+    logger.info("[transactions] Fetched:", rows.length, "records for", userId);
     return res.json(rows);
   } catch (e) {
+    logger.error("[transactions] Error:", e);
     return res.status(500).json({ message: e.message });
   }
 };
 
+/* ---------------------- WITHDRAW ---------------------- */
 exports.withdraw = async (req, res) => {
   try {
     const {
@@ -319,52 +298,60 @@ exports.withdraw = async (req, res) => {
       paymentMethod,
       reason = "Wallet Withdrawal",
     } = req.body || {};
-    if (!amount || amount <= 0)
+
+    if (!amount || amount <= 0) {
+      logger.warn("[withdraw] Invalid amount:", amount);
       return res.status(400).json({ message: "amount must be > 0" });
+    }
 
     const userId = String(req.user.id);
     const role = "driver";
-    if (req.user.type !== "driver")
+    if (req.user.type !== "driver") {
+      logger.warn("[withdraw] Unauthorized attempt by user:", req.user.id);
       return res.status(403).json({ message: "Only drivers can withdraw" });
+    }
 
     const wallet = await Wallet.findOne({ userId, role });
-    if (!wallet || wallet.balance < amount)
+    if (!wallet || wallet.balance < amount) {
+      logger.warn("[withdraw] Insufficient balance for user:", userId);
       return res.status(400).json({ message: "Insufficient balance" });
-    // We DO NOT deduct until provider confirms success via webhook
+    }
+
     const tx = await Transaction.create({
       userId,
       role,
       amount,
       type: "debit",
       method,
-      status: "pending",
+      status: "PENDING",
       metadata: { destination, reason },
     });
+    logger.info("[withdraw] Transaction created:", tx._id.toString());
 
     // Normalize Ethiopian MSISDN
     const normalizeMsisdnEt = (raw) => {
       if (!raw) return null;
       let s = String(raw).trim();
       s = s.replace(/\s+/g, "").replace(/[-()]/g, "");
-      if (/^\+?251/.test(s)) {
-        s = s.replace(/^\+?251/, "+251");
-      } else if (/^0\d+/.test(s)) {
-        s = s.replace(/^0/, "+251");
-      } else if (/^9\d{8}$/.test(s)) {
-        s = "+251" + s;
-      }
+      if (/^\+?251/.test(s)) s = s.replace(/^\+?251/, "+251");
+      else if (/^0\d+/.test(s)) s = s.replace(/^0/, "+251");
+      else if (/^9\d{8}$/.test(s)) s = "+251" + s;
       if (!/^\+2519\d{8}$/.test(s)) return null;
       return s;
     };
-    // Kick off payout transfer
+
     const msisdn = normalizeMsisdnEt(
       destination || req.user.phone || req.user.phoneNumber
     );
-    if (!msisdn)
+    if (!msisdn) {
+      logger.warn("[withdraw] Invalid destination phone:", destination);
       return res.status(400).json({ message: "Invalid destination phone" });
+    }
+
     const notifyUrl =
       process.env.SANTIMPAY_WITHDRAW_NOTIFY_URL ||
       `${process.env.PUBLIC_BASE_URL || ""}/v1/wallet/webhook`;
+
     try {
       const gw = await santim.payoutTransfer({
         id: tx._id.toString(),
@@ -376,15 +363,18 @@ exports.withdraw = async (req, res) => {
       });
       const gwTxnId =
         gw?.TxnId || gw?.txnId || gw?.data?.TxnId || gw?.data?.txnId;
+
       await Transaction.findByIdAndUpdate(tx._id, {
         txnId: gwTxnId,
         metadata: { ...tx.metadata, gatewayResponse: gw },
       });
+      logger.info("[withdraw] Payout initiated:", { txId: tx._id, gwTxnId });
     } catch (err) {
       await Transaction.findByIdAndUpdate(tx._id, {
         status: "failed",
         metadata: { ...tx.metadata, gatewayError: err.message },
       });
+      logger.error("[withdraw] Payout initiation failed:", err.message);
       return res
         .status(502)
         .json({ message: `Payout initiation failed: ${err.message}` });
@@ -395,6 +385,7 @@ exports.withdraw = async (req, res) => {
       transactionId: tx._id.toString(),
     });
   } catch (e) {
+    logger.error("[withdraw] Error:", e);
     return res.status(500).json({ message: e.message });
   }
 };
