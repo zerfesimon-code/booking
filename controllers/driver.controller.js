@@ -233,7 +233,9 @@ module.exports = {
   },
   setPaymentPreference: async (req, res) => {
     try {
-      const { paymentOptionId, driverId } = req.body || {};
+      let { paymentOptionId, driverId, id } = req.body || {};
+      // Accept `id` as an alias for `paymentOptionId` for convenience
+      if (!paymentOptionId && id) paymentOptionId = id;
       const actingIsDriver = req.user && req.user.type === 'driver';
       const actingIsAdmin = req.user && (req.user.type === 'admin' || (Array.isArray(req.user.roles) && req.user.roles.includes('superadmin')));
       const targetDriverId = actingIsDriver ? String(req.user.id) : String(driverId || '');
