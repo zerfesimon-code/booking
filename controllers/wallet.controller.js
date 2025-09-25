@@ -221,8 +221,15 @@ exports.webhook = async (req, res) => {
         try {
           const { Commission } = require("../models/commission");
           const financeService = require("../services/financeService");
-          const commissionDoc = await Commission.findOne({ isActive: true }).sort({ createdAt: -1 });
-          const commissionRate = commissionDoc ? commissionDoc.percentage : Number(process.env.COMMISSION_RATE || 15);
+          let commissionRate = Number(process.env.COMMISSION_RATE || 15);
+          try {
+            if (tx && tx.role === 'driver' && tx.userId) {
+              const commissionDoc = await Commission.findOne({ driverId: String(tx.userId) }).sort({ createdAt: -1 });
+              if (commissionDoc && Number.isFinite(commissionDoc.percentage)) {
+                commissionRate = commissionDoc.percentage;
+              }
+            }
+          } catch (_) {}
           if (tx.role === 'driver') {
             delta = financeService.calculatePackage(providerAmount, commissionRate);
           }

@@ -190,8 +190,8 @@ async function estimateFareForDriver(booking) {
     surgeMultiplier: pricing.surgeMultiplier
   };
   const estimatedFare = (fareBreakdown.base + fareBreakdown.distanceCost + fareBreakdown.timeCost + fareBreakdown.waitingCost) * fareBreakdown.surgeMultiplier;
-  const commissionDoc = await Commission.findOne({ isActive: true }).sort({ createdAt: -1 });
-  const commissionRate = commissionDoc ? commissionDoc.percentage : 15;
+  const commissionDoc = booking.driverId ? await Commission.findOne({ driverId: String(booking.driverId) }).sort({ createdAt: -1 }) : null;
+  const commissionRate = commissionDoc && Number.isFinite(commissionDoc.percentage) ? commissionDoc.percentage : Number(process.env.COMMISSION_RATE || 15);
   const grossFare = estimatedFare;
   const commissionAmount = (grossFare * commissionRate) / 100;
   const netEarnings = grossFare - commissionAmount;

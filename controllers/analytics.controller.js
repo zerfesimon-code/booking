@@ -297,18 +297,20 @@ exports.getDriverEarnings = async (req, res) => {
 // Commission Management
 exports.setCommission = async (req, res) => {
   try {
-    const { percentage, description } = req.body;
+    const { driverId, percentage, description } = req.body;
     const adminId = req.user.id;
 
     if (percentage < 0 || percentage > 100) {
       return res.status(400).json({ message: 'Commission percentage must be between 0 and 100' });
     }
 
-    // Deactivate current commission
-    await Commission.updateMany({ isActive: true }, { isActive: false });
+    if (!driverId) {
+      return res.status(400).json({ message: 'driverId is required to set commission' });
+    }
 
-    // Create new commission
+    // Create driver-specific commission entry (latest wins)
     const commission = await Commission.create({
+      driverId: String(driverId),
       percentage,
       description,
       createdBy: adminId
@@ -322,8 +324,12 @@ exports.setCommission = async (req, res) => {
 
 exports.getCommission = async (req, res) => {
   try {
-    const commission = await Commission.findOne({ isActive: true }).sort({ createdAt: -1 });
-    res.json(commission || { percentage: 15, isActive: true }); // Default 15%
+    const driverId = req.query.driverId || req.params.driverId || req.user?.id;
+    if (!driverId) {
+      return res.json({ percentage: Number(process.env.COMMISSION_RATE || 15) });
+    }
+    const commission = await Commission.findOne({ driverId: String(driverId) }).sort({ createdAt: -1 });
+    res.json(commission || { percentage: Number(process.env.COMMISSION_RATE || 15) });
   } catch (e) {
     res.status(500).json({ message: `Failed to get commission: ${e.message}` });
   }

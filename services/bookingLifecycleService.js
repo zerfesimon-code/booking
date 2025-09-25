@@ -90,9 +90,14 @@ async function completeTrip(bookingId, endLocation, options = {}) {
   const waitingTimeMinutes = Math.max(0, Math.round(((completedAt - new Date(startedAt)) / 60000)));
 
   const fare = await pricingService.calculateFare(distanceKm, waitingTimeMinutes, booking.vehicleType, surgeMultiplier, discount);
-  // Get dynamic commission rate from model (admin configurable)
-  const commissionDoc = await Commission.findOne({ isActive: true }).sort({ createdAt: -1 });
-  const commissionRate = commissionDoc ? commissionDoc.percentage : Number(process.env.COMMISSION_RATE || 15);
+  // Get per-driver commission rate set by admin; fallback to env default
+  let commissionRate = Number(process.env.COMMISSION_RATE || 15);
+  if (booking.driverId) {
+    const commissionDoc = await Commission.findOne({ driverId: String(booking.driverId) }).sort({ createdAt: -1 });
+    if (commissionDoc && Number.isFinite(commissionDoc.percentage)) {
+      commissionRate = commissionDoc.percentage;
+    }
+  }
   const commission = financeService.calculateCommission(fare, commissionRate);
   const driverEarnings = fare - commission;
 

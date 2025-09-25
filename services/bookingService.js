@@ -272,8 +272,8 @@ async function updateBookingLifecycle({ requester, id, status }) {
     booking.completedAt = new Date();
     booking.fareFinal = booking.fareEstimated;
     if (booking.driverId) {
-      const commission = await Commission.findOne({ isActive: true }).sort({ createdAt: -1 });
-      const commissionRate = commission ? commission.percentage : 15;
+      const commission = await Commission.findOne({ driverId: String(booking.driverId) }).sort({ createdAt: -1 });
+      const commissionRate = commission && Number.isFinite(commission.percentage) ? commission.percentage : Number(process.env.COMMISSION_RATE || 15);
       const grossFare = booking.fareFinal || booking.fareEstimated;
       const commissionAmount = financeService.calculateCommission(grossFare, commissionRate);
       const netEarnings = financeService.calculateNetIncome(grossFare, commissionRate);

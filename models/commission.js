@@ -1,9 +1,8 @@
 const mongoose = require('mongoose');
 
 const CommissionSchema = new mongoose.Schema({
+  driverId: { type: String, required: true, index: true },
   percentage: { type: Number, required: true, min: 0, max: 100 },
-  isActive: { type: Boolean, default: true },
-  effectiveFrom: { type: Date, default: Date.now },
   effectiveTo: { type: Date },
   createdBy: { type: String, required: true }, // Admin ID who set this commission
   description: { type: String }
