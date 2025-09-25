@@ -220,8 +220,23 @@ module.exports = {
   listPaymentOptions: async (req, res) => {
     try {
       const rows = await paymentService.getPaymentOptions();
-      const data = (rows || []).map(o => ({ id: String(o._id), name: o.name, logo: o.logo }));
-      return res.json(data);
+      const driverId = (req.user && req.user.type === 'driver') ? String(req.user.id) : undefined;
+      let selectedId = null;
+      if (driverId) {
+        try {
+          const d = await Driver.findById(driverId).select('paymentPreference name phone').lean();
+          selectedId = d && d.paymentPreference ? String(d.paymentPreference) : null;
+        } catch (_) {}
+      }
+      const data = (rows || []).map(o => ({ id: String(o._id), name: o.name, logo: o.logo, selected: selectedId ? String(o._id) === String(selectedId) : false }));
+      // sort: selected first, then by name ascending (already pre-sorted from service)
+      data.sort((a, b) => (a.selected === b.selected ? a.name.localeCompare(b.name) : (a.selected ? -1 : 1)));
+      const driverInfo = (req.user && req.user.type === 'driver') ? {
+        id: String(req.user.id),
+        name: req.user.name || req.user.fullName || req.user.displayName || '',
+        phone: req.user.phone || req.user.phoneNumber || req.user.mobile || ''
+      } : undefined;
+      return res.json({ options: data, driver: driverInfo });
     } catch (e) { errorHandler(res, e); }
   },
   setPaymentPreference: async (req, res) => {
@@ -230,7 +245,21 @@ module.exports = {
       const { paymentOptionId } = req.body || {};
       if (!paymentOptionId) return res.status(400).json({ message: 'paymentOptionId is required' });
       const updated = await paymentService.setDriverPaymentPreference(String(req.user.id), paymentOptionId);
-      return res.json(updated);
+      const driverInfo = {
+        id: String(updated._id),
+        name: updated.name,
+        phone: updated.phone
+      };
+      const preference = updated.paymentPreference ? {
+        _id: String(updated.paymentPreference._id || updated.paymentPreference),
+        name: updated.paymentPreference.name,
+        logo: updated.paymentPreference.logo
+      } : null;
+      return res.json({
+        message: 'Payment preference updated',
+        driver: driverInfo,
+        paymentPreference: preference
+      });
     } catch (e) { errorHandler(res, e); }
   }
 };

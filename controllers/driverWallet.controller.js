@@ -6,7 +6,10 @@ exports.getWallet = async (req, res) => {
     const driverId = req.params.id;
     console.log('[wallet] getWallet for driver:', String(driverId));
     const wallet = await Wallet.findOne({ userId: String(driverId), role: 'driver' }).lean();
-    return res.json(wallet || { userId: String(driverId), role: 'driver', balance: 0, totalEarnings: 0, currency: 'ETB' });
+    const { Driver } = require('../models/userModels');
+    const d = await Driver.findById(driverId).select('name phone').lean();
+    const driver = { id: String(driverId), name: d?.name || '', phone: d?.phone || '' };
+    return res.json({ driver, wallet: wallet || { userId: String(driverId), role: 'driver', balance: 0, totalEarnings: 0, currency: 'ETB' } });
   } catch (e) { return res.status(500).json({ message: e.message }); }
 };
 
@@ -47,7 +50,9 @@ exports.adjustBalance = async (req, res) => {
       );
 
       console.log('[wallet-admin] adjustBalance completed:', { driverId: String(driverId), newBalance: wallet.balance, transactionId: String(txDoc._id) });
-      out = { wallet, transactionId: String(txDoc._id) };
+      const { Driver } = require('../models/userModels');
+      const d = await Driver.findById(driverId).select('name phone').lean();
+      out = { driver: { id: String(driverId), name: d?.name || '', phone: d?.phone || '' }, wallet, transactionId: String(txDoc._id) };
     });
     session.endSession();
     return res.json(out);
@@ -59,7 +64,9 @@ exports.listTransactions = async (req, res) => {
     const driverId = req.params.id;
     console.log('[wallet] listTransactions for driver:', String(driverId));
     const rows = await Transaction.find({ userId: String(driverId), role: 'driver' }).sort({ createdAt: -1 }).lean();
-    return res.json(rows);
+    const { Driver } = require('../models/userModels');
+    const d = await Driver.findById(driverId).select('name phone').lean();
+    return res.json({ driver: { id: String(driverId), name: d?.name || '', phone: d?.phone || '' }, transactions: rows });
   } catch (e) { return res.status(500).json({ message: e.message }); }
 };
 
@@ -88,7 +95,9 @@ exports.withdraw = async (req, res) => {
       ], { session });
       const txDoc = Array.isArray(tx) ? tx[0] : tx;
       console.log('[wallet] withdraw completed:', { driverId: String(driverId), newBalance: updated.balance, transactionId: String(txDoc._id) });
-      result = { wallet: updated, transactionId: String(txDoc._id) };
+      const { Driver } = require('../models/userModels');
+      const d = await Driver.findById(driverId).select('name phone').lean();
+      result = { driver: { id: String(driverId), name: d?.name || '', phone: d?.phone || '' }, wallet: updated, transactionId: String(txDoc._id) };
     });
     session.endSession();
     return res.json(result);
