@@ -220,16 +220,29 @@ module.exports = {
   listPaymentOptions: async (req, res) => {
     try {
       const rows = await paymentService.getPaymentOptions();
-      const data = (rows || []).map(o => ({ id: String(o._id), name: o.name, logo: o.logo }));
+      let selectedId = null;
+      try {
+        if (req.user && req.user.type === 'driver') {
+          const me = await Driver.findById(String(req.user.id)).select({ paymentPreference: 1 }).lean();
+          selectedId = me && me.paymentPreference ? String(me.paymentPreference) : null;
+        }
+      } catch (_) {}
+      const data = (rows || []).map(o => ({ id: String(o._id || o.id), name: o.name, logo: o.logo, selected: selectedId ? String(o._id || o.id) === String(selectedId) : false }));
       return res.json(data);
     } catch (e) { errorHandler(res, e); }
   },
   setPaymentPreference: async (req, res) => {
     try {
-      if (!req.user || req.user.type !== 'driver') return res.status(403).json({ message: 'Driver authentication required' });
-      const { paymentOptionId } = req.body || {};
+      let { paymentOptionId, driverId, id } = req.body || {};
+      // Accept `id` as an alias for `paymentOptionId` for convenience
+      if (!paymentOptionId && id) paymentOptionId = id;
+      const actingIsDriver = req.user && req.user.type === 'driver';
+      const actingIsAdmin = req.user && (req.user.type === 'admin' || (Array.isArray(req.user.roles) && req.user.roles.includes('superadmin')));
+      const targetDriverId = actingIsDriver ? String(req.user.id) : String(driverId || '');
+      if (!actingIsDriver && !actingIsAdmin) return res.status(403).json({ message: 'Forbidden: driver or admin required' });
       if (!paymentOptionId) return res.status(400).json({ message: 'paymentOptionId is required' });
-      const updated = await paymentService.setDriverPaymentPreference(String(req.user.id), paymentOptionId);
+      if (!targetDriverId) return res.status(400).json({ message: 'driverId is required for admin to set preference' });
+      const updated = await paymentService.setDriverPaymentPreference(targetDriverId, paymentOptionId);
       return res.json(updated);
     } catch (e) { errorHandler(res, e); }
   }

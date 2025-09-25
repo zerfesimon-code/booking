@@ -39,6 +39,6 @@ router.post('/discover-and-estimate', authenticate, ctrl.discoverAndEstimate);
 
 // Payment options via driver route namespace (alternative path)
 router.get('/payment-options', authenticate, ctrl.listPaymentOptions);
-router.post('/payment-preference', authenticate, authorize('driver'), ctrl.setPaymentPreference);
+router.post('/payment-preference', authenticate, ctrl.setPaymentPreference);
 
 module.exports = router;

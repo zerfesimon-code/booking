@@ -34,13 +34,20 @@ router.use("/drivers", require("./driver.routes"));
 router.get('/payment-options', async (req, res) => {
   try {
     const ctrl = require('../../controllers/driver.controller');
-    const rows = await require('../../services/paymentService').getPaymentOptions();
-    return res.json(rows);
+    return await ctrl.listPaymentOptions(req, res);
   } catch (e) {
     return res.status(500).json({ message: e.message });
   }
 });
-router.post('/driver/payment-preference', authorize('driver'), async (req, res) => {
+router.post('/payment-options', authorize('admin','superadmin'), async (req, res) => {
+  try {
+    const { create } = require('../../controllers/paymentOption.controller');
+    return await create(req, res);
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+});
+router.post('/driver/payment-preference', async (req, res) => {
   try {
     const ctrl = require('../../controllers/driver.controller');
     return await ctrl.setPaymentPreference(req, res);

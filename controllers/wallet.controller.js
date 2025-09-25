@@ -58,18 +58,31 @@ exports.topup = async (req, res) => {
       metadata: { reason },
     });
 
-    // Normalize payment method for SantimPay API
+    // Resolve payment method from explicit param or driver's selected PaymentOption
+    async function resolvePaymentMethod() {
+      const pick = (v) => (typeof v === 'string' && v.trim().length) ? v.trim() : null;
+      const explicit = pick(paymentMethod);
+      if (explicit) return explicit;
+      try {
+        const { Driver } = require("../models/userModels");
+        const me = await Driver.findById(String(userId)).select({ paymentPreference: 1 }).populate({ path: 'paymentPreference', select: { name: 1 } });
+        const name = me && me.paymentPreference && me.paymentPreference.name ? String(me.paymentPreference.name).trim() : null;
+        if (name) return name;
+      } catch (_) {}
+      const err = new Error('paymentMethod is required and no driver payment preference is set');
+      err.status = 400;
+      throw err;
+    }
+    // Normalize for SantimPay API accepted values
     const normalizePaymentMethod = (method) => {
-      const m = String(method || "")
-        .trim()
-        .toLowerCase();
+      const m = String(method || "").trim().toLowerCase();
       if (m === "telebirr" || m === "tele") return "Telebirr";
       if (m === "cbe" || m === "cbe-birr" || m === "cbebirr") return "CBE";
       if (m === "hellocash" || m === "hello-cash") return "HelloCash";
-      return "Telebirr";
+      return method; // pass-through for other configured options
     };
 
-    const methodForGateway = normalizePaymentMethod(paymentMethod);
+    const methodForGateway = normalizePaymentMethod(await resolvePaymentMethod());
 
     const notifyUrl =
       process.env.SANTIMPAY_NOTIFY_URL ||
@@ -221,8 +234,15 @@ exports.webhook = async (req, res) => {
         try {
           const { Commission } = require("../models/commission");
           const financeService = require("../services/financeService");
-          const commissionDoc = await Commission.findOne({ isActive: true }).sort({ createdAt: -1 });
-          const commissionRate = commissionDoc ? commissionDoc.percentage : Number(process.env.COMMISSION_RATE || 15);
+          let commissionRate = Number(process.env.COMMISSION_RATE || 15);
+          try {
+            if (tx && tx.role === 'driver' && tx.userId) {
+              const commissionDoc = await Commission.findOne({ driverId: String(tx.userId) }).sort({ createdAt: -1 });
+              if (commissionDoc && Number.isFinite(commissionDoc.percentage)) {
+                commissionRate = commissionDoc.percentage;
+              }
+            }
+          } catch (_) {}
           if (tx.role === 'driver') {
             delta = financeService.calculatePackage(providerAmount, commissionRate);
           }
@@ -345,12 +365,35 @@ exports.withdraw = async (req, res) => {
       process.env.SANTIMPAY_WITHDRAW_NOTIFY_URL ||
       `${process.env.PUBLIC_BASE_URL || ""}/v1/wallet/webhook`;
     try {
+      // Resolve payment method from explicit param or driver's selected PaymentOption
+      async function resolvePaymentMethodWithdraw() {
+        const pick = (v) => (typeof v === 'string' && v.trim().length) ? v.trim() : null;
+        const explicit = pick(paymentMethod);
+        if (explicit) return explicit;
+        try {
+          const { Driver } = require("../models/userModels");
+          const me = await Driver.findById(String(userId)).select({ paymentPreference: 1 }).populate({ path: 'paymentPreference', select: { name: 1 } });
+          const name = me && me.paymentPreference && me.paymentPreference.name ? String(me.paymentPreference.name).trim() : null;
+          if (name) return name;
+        } catch (_) {}
+        const err = new Error('paymentMethod is required and no driver payment preference is set');
+        err.status = 400;
+        throw err;
+      }
+      const normalizePaymentMethod2 = (method) => {
+        const m = String(method || "").trim().toLowerCase();
+        if (m === "telebirr" || m === "tele") return "Telebirr";
+        if (m === "cbe" || m === "cbe-birr" || m === "cbebirr") return "CBE";
+        if (m === "hellocash" || m === "hello-cash") return "HelloCash";
+        return method;
+      };
+      const pm = normalizePaymentMethod2(await resolvePaymentMethodWithdraw());
       const gw = await santim.payoutTransfer({
         id: tx._id.toString(),
         amount,
         paymentReason: reason,
         phoneNumber: msisdn,
-        paymentMethod: paymentMethod || "Telebirr",
+        paymentMethod: pm,
         notifyUrl,
       });
       const gwTxnId =

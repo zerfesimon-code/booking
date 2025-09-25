@@ -77,9 +77,11 @@ This document lists all Socket.IO events in the system, who emits them, required
 
 - Event: `trip_ongoing`
   - Target: Room `booking:{bookingId}`
-  - Payload: `{ bookingId, location }`
+  - Payload: `{ bookingId, location: { latitude, longitude, bearing?, timestamp? } }`
 
 - Event: `trip_completed`
+  - Target: Room `booking:{bookingId}`
+  - Payload: `{ bookingId, amount, distance, waitingTime, completedAt, driverEarnings, commission }`
 
 - Event: `booking_accept`
   - Target: Room `booking:{bookingId}`
@@ -102,22 +104,23 @@ This document lists all Socket.IO events in the system, who emits them, required
 
 ### Driver Domain (Server Emits)
 
-- Event: `driver:init_bookings`
+- Event: `booking:nearby`
   - Target: Driver socket immediately after connection
   - Payload:
     {
+      init: true,
       driverId: "<ObjectId>",
       bookings: [
         {
           bookingId: "<ObjectId>",
-          status: "pending",
-          pickup: "Bole Airport",
-          dropoff: "CMC",
-          fare: 350,
+          status: "requested|accepted|ongoing",
+          pickup: any,
+          dropoff: any,
+          fare: number,
           passenger: {
             id: "<ObjectId>",
-            name: "Jane Doe",
-            phone: "+251911111111"
+            name: string,
+            phone: string
           }
         }
       ]
@@ -176,15 +179,30 @@ This document lists all Socket.IO events in the system, who emits them, required
 
 - Event: `pricing:update`
   - Emitter: Server (HTTP pricing controller)
-  - Payload: Updated pricing model document
+  - Payload: Updated pricing model document payload(bookingId)
 
 ---
 
 ### Booking Domain (Broadcasts)
 
-- Event: `booking:new:broadcast`
-  - Emitter: Server (events/bookingEvents)
-  - Payload: New booking summary for passenger broadcast channels
+- Event: `booking:new`
+  - Emitter: Server (targeted to drivers) via `sendMessageToSocketId('driver:{driverId}')`
+  - Payload:
+    {
+      bookingId: "<ObjectId>",
+      patch: {
+        status: "requested",
+        passengerId: "<ObjectId>",
+        vehicleType: string,
+        pickup: any,
+        dropoff: any,
+        passenger: { id, name, phone }
+      }
+    }
+
+- Event: `booking:removed`
+  - Emitter: Server (targeted to nearby drivers) via `sendMessageToSocketId('driver:{driverId}')`
+  - Payload: `{ bookingId }`
 
 - Event: `booking:update`
   - Emitter: Server (events/bookingEvents)
