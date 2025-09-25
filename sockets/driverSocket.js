@@ -72,7 +72,7 @@ module.exports = (io, socket) => {
         driverId: String(d._id),
         vehicleType: d.vehicleType,
         available: d.available,
-        lastKnownLocation: d.lastKnownLocation,
+        lastKnownLocation: { latitude: d.lastKnownLocation?.latitude, longitude: d.lastKnownLocation?.longitude, bearing: d.lastKnownLocation?.bearing },
         updatedAt: d.updatedAt
       });
       try { logger.info('[socket->broadcast] driver location updated', { userId: socket.user && socket.user.id, lat: d.lastKnownLocation?.latitude, lon: d.lastKnownLocation?.longitude }); } catch (_) {}

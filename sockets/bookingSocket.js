@@ -65,21 +65,24 @@ module.exports = (io, socket) => {
         }
 
         if (chosenDriver) {
-          const patch = {
-            bookingId: String(booking._id),
-            patch: {
-              status: 'requested',
-              passengerId,
-              vehicleType: booking.vehicleType,
-              pickup: booking.pickup,
-              dropoff: booking.dropoff,
-              passenger: { id: passengerId, name: socket.user.name, phone: socket.user.phone }
-            },
-            user: { id: passengerId, type: 'passenger' }
+          const bookingDetails = {
+            id: String(booking._id),
+            status: 'requested',
+            passengerId,
+            passenger: { id: passengerId, name: socket.user.name, phone: socket.user.phone },
+            vehicleType: booking.vehicleType,
+            pickup: booking.pickup,
+            dropoff: booking.dropoff,
+            fareEstimated: booking.fareEstimated,
+            fareFinal: booking.fareFinal,
+            distanceKm: booking.distanceKm,
+            createdAt: booking.createdAt,
+            updatedAt: booking.updatedAt
           };
+          const payloadForDriver = { booking: bookingDetails, user: { id: passengerId, type: 'passenger' } };
           const channel = `driver:${String(chosenDriver._id)}`;
-          sendMessageToSocketId(channel, { event: 'booking:new', data: patch });
-          try { logger.info('message sent to: ', channel.replace('driver:', 'driver:'), { bookingId: String(booking._id) }); } catch (_) {}
+          sendMessageToSocketId(channel, { event: 'booking:new', data: payloadForDriver });
+          try { logger.info('message sent to:  driver:' + String(chosenDriver._id), { bookingId: String(booking._id) }); } catch (_) {}
         } else {
           try { logger.info('[socket->drivers] no eligible driver (package/distance)', { bookingId: String(booking._id) }); } catch (_) {}
         }
