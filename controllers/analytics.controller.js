@@ -114,14 +114,16 @@ exports.getDailyReport = async (req, res) => {
         { $group: { _id: null, total: { $sum: '$commissionEarned' } } }
       ]);
 
+      const completedCountD = rides.filter(r => r.status === 'completed').length;
+      const avgFareD = completedCountD > 0 ? totalRevenue / completedCountD : 0;
       report = await DailyReport.create({
         date: targetDate,
         totalRides: rides.length,
         totalRevenue,
         totalCommission: totalCommission[0]?.total || 0,
-        completedRides: rides.filter(r => r.status === 'completed').length,
+        completedRides: completedCountD,
         canceledRides: rides.filter(r => r.status === 'canceled').length,
-        averageFare: rides.length > 0 ? totalRevenue / rides.filter(r => r.status === 'completed').length : 0,
+        averageFare: Number.isFinite(avgFareD) ? avgFareD : 0,
         rideDetails: rides.map(r => ({
           bookingId: r._id,
           driverId: r.driverId,
@@ -164,15 +166,17 @@ exports.getWeeklyReport = async (req, res) => {
         { $group: { _id: null, total: { $sum: '$commissionEarned' } } }
       ]);
 
+      const completedCount = rides.filter(r => r.status === 'completed').length;
+      const avgFare = completedCount > 0 ? totalRevenue / completedCount : 0;
       report = await WeeklyReport.create({
         weekStart: startDate,
         weekEnd: endDate,
         totalRides: rides.length,
         totalRevenue,
         totalCommission: totalCommission[0]?.total || 0,
-        completedRides: rides.filter(r => r.status === 'completed').length,
+        completedRides: completedCount,
         canceledRides: rides.filter(r => r.status === 'canceled').length,
-        averageFare: rides.length > 0 ? totalRevenue / rides.filter(r => r.status === 'completed').length : 0
+        averageFare: Number.isFinite(avgFare) ? avgFare : 0
       });
     }
 
@@ -207,15 +211,17 @@ exports.getMonthlyReport = async (req, res) => {
         { $group: { _id: null, total: { $sum: '$commissionEarned' } } }
       ]);
 
+      const completedCountM = rides.filter(r => r.status === 'completed').length;
+      const avgFareM = completedCountM > 0 ? totalRevenue / completedCountM : 0;
       report = await MonthlyReport.create({
         month: targetMonth,
         year: targetYear,
         totalRides: rides.length,
         totalRevenue,
         totalCommission: totalCommission[0]?.total || 0,
-        completedRides: rides.filter(r => r.status === 'completed').length,
+        completedRides: completedCountM,
         canceledRides: rides.filter(r => r.status === 'canceled').length,
-        averageFare: rides.length > 0 ? totalRevenue / rides.filter(r => r.status === 'completed').length : 0
+        averageFare: Number.isFinite(avgFareM) ? avgFareM : 0
       });
     }
 

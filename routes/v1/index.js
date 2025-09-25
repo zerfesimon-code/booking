@@ -47,7 +47,7 @@ router.post('/payment-options', authorize('admin','superadmin'), async (req, res
     return res.status(500).json({ message: e.message });
   }
 });
-router.post('/driver/payment-preference', authorize('driver'), async (req, res) => {
+router.post('/driver/payment-preference', async (req, res) => {
   try {
     const ctrl = require('../../controllers/driver.controller');
     return await ctrl.setPaymentPreference(req, res);

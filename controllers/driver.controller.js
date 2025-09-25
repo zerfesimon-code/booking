@@ -233,10 +233,14 @@ module.exports = {
   },
   setPaymentPreference: async (req, res) => {
     try {
-      if (!req.user || req.user.type !== 'driver') return res.status(403).json({ message: 'Driver authentication required' });
-      const { paymentOptionId } = req.body || {};
+      const { paymentOptionId, driverId } = req.body || {};
+      const actingIsDriver = req.user && req.user.type === 'driver';
+      const actingIsAdmin = req.user && (req.user.type === 'admin' || (Array.isArray(req.user.roles) && req.user.roles.includes('superadmin')));
+      const targetDriverId = actingIsDriver ? String(req.user.id) : String(driverId || '');
+      if (!actingIsDriver && !actingIsAdmin) return res.status(403).json({ message: 'Forbidden: driver or admin required' });
       if (!paymentOptionId) return res.status(400).json({ message: 'paymentOptionId is required' });
-      const updated = await paymentService.setDriverPaymentPreference(String(req.user.id), paymentOptionId);
+      if (!targetDriverId) return res.status(400).json({ message: 'driverId is required for admin to set preference' });
+      const updated = await paymentService.setDriverPaymentPreference(targetDriverId, paymentOptionId);
       return res.json(updated);
     } catch (e) { errorHandler(res, e); }
   }
