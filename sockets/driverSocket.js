@@ -6,6 +6,11 @@ module.exports = (io, socket) => {
   // On connection, send initial nearby unassigned bookings (pre-existing) and current driver bookings
   try {
     if (socket.user && String(socket.user.type).toLowerCase() === 'driver') {
+      // Join driver-specific room so targeted events like booking:new and booking:removed are received
+      try {
+        const driverRoom = `driver:${String(socket.user.id)}`;
+        socket.join(driverRoom);
+      } catch (_) {}
       (async () => {
         try {
           const { Booking } = require('../models/bookingModels');
