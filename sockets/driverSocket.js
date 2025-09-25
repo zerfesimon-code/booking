@@ -13,6 +13,7 @@ module.exports = (io, socket) => {
             .limit(50)
             .lean();
           const payload = {
+            init: true,
             driverId: String(socket.user.id),
             bookings: rows.map(b => ({
               bookingId: String(b._id),
@@ -23,7 +24,7 @@ module.exports = (io, socket) => {
               passenger: b.passengerId ? { id: String(b.passengerId), name: b.passengerName, phone: b.passengerPhone } : undefined
             }))
           };
-          socket.emit('driver:init_bookings', payload);
+          socket.emit('booking:nearby', payload);
         } catch (_) {}
       })();
     }
