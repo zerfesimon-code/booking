@@ -51,7 +51,15 @@ module.exports = (io, socket) => {
       if (!socket.user || String(socket.user.type).toLowerCase() !== 'driver') {
         return socket.emit('booking_error', { message: 'Unauthorized: driver token required', source: 'booking:driver_location_update' });
       }
-      const data = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
+      const raw = typeof payload === 'string' ? JSON.parse(payload) : (payload || {});
+      const data = {
+        latitude: raw.latitude != null ? Number(raw.latitude) : undefined,
+        longitude: raw.longitude != null ? Number(raw.longitude) : undefined,
+        bearing: raw.bearing != null ? Number(raw.bearing) : undefined
+      };
+      if (!Number.isFinite(data.latitude) || !Number.isFinite(data.longitude)) {
+        return socket.emit('booking_error', { message: 'latitude and longitude must be numbers', source: 'booking:driver_location_update' });
+      }
       const d = await driverService.updateLocation(String(socket.user.id), data, socket.user);
       driverEvents.emitDriverLocationUpdate({
         driverId: String(d._id),

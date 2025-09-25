@@ -220,7 +220,14 @@ module.exports = {
   listPaymentOptions: async (req, res) => {
     try {
       const rows = await paymentService.getPaymentOptions();
-      const data = (rows || []).map(o => ({ id: String(o._id), name: o.name, logo: o.logo }));
+      let selectedId = null;
+      try {
+        if (req.user && req.user.type === 'driver') {
+          const me = await Driver.findById(String(req.user.id)).select({ paymentPreference: 1 }).lean();
+          selectedId = me && me.paymentPreference ? String(me.paymentPreference) : null;
+        }
+      } catch (_) {}
+      const data = (rows || []).map(o => ({ id: String(o._id || o.id), name: o.name, logo: o.logo, selected: selectedId ? String(o._id || o.id) === String(selectedId) : false }));
       return res.json(data);
     } catch (e) { errorHandler(res, e); }
   },

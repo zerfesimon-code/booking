@@ -5,6 +5,22 @@ async function getPaymentOptions() {
   return PaymentOption.find({}).select({ name: 1, logo: 1 }).sort({ name: 1 }).lean();
 }
 
+async function createPaymentOption({ name, logo }) {
+  if (!name || String(name).trim().length === 0) {
+    const err = new Error('name is required');
+    err.status = 400;
+    throw err;
+  }
+  const exists = await PaymentOption.findOne({ name: String(name).trim() }).lean();
+  if (exists) {
+    const err = new Error('Payment option already exists');
+    err.status = 409;
+    throw err;
+  }
+  const row = await PaymentOption.create({ name: String(name).trim(), logo });
+  return { id: String(row._id), name: row.name, logo: row.logo };
+}
+
 async function setDriverPaymentPreference(driverId, paymentOptionId) {
   const opt = await PaymentOption.findById(paymentOptionId).lean();
   if (!opt) {
@@ -22,5 +38,5 @@ async function setDriverPaymentPreference(driverId, paymentOptionId) {
   return updated;
 }
 
-module.exports = { getPaymentOptions, setDriverPaymentPreference };
+module.exports = { getPaymentOptions, setDriverPaymentPreference, createPaymentOption };
 
